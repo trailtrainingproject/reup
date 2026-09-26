@@ -34,7 +34,7 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ id?: string; full_name?: string; role?: string } | null>(null);
-
+  const [loginRole, setLoginRole] = useState<'athlete' | 'coach'>('athlete');
   // Estados do Dashboard do Atleta
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [gearList, setGearList] = useState<any[]>([]);
