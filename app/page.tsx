@@ -24,8 +24,6 @@ import {
   Scale,
   User,
   ArrowLeft,
-  ChevronDown,
-  ChevronRight,
   FileSpreadsheet,
   CheckCircle2,
   Zap,
@@ -34,7 +32,8 @@ import {
   Calendar,
   Printer,
   Flag,
-  Clock
+  Clock,
+  LayoutDashboard
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FitParser from 'fit-file-parser';
@@ -98,10 +97,6 @@ export default function CoachDashboard() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Estados dos menus Dropdown
-  const [dropdownAthletesOpen, setDropdownAthletesOpen] = useState(false);
-  const [dropdownRacesOpen, setDropdownRacesOpen] = useState(false);
-
   // Utilizador Autenticado (Treinador)
   const [coachProfile, setCoachProfile] = useState<{ id: string; full_name?: string } | null>(null);
 
@@ -125,7 +120,7 @@ export default function CoachDashboard() {
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário de Prova & Questionário Avançado
+  // Formulário de Prova & Questionário Avançado Completo
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
@@ -136,15 +131,17 @@ export default function CoachDashboard() {
     targetCarbsPerHour: '60',
     maxHeartRate: '185',
     restingHeartRate: '50',
-    // Postos de Abastecimento personalizáveis
     aidStationsInput: 'KM 12 - Posto de Água | KM 25 - Abastecimento Completo | KM 38 - Base de Vida',
-    // Métricas Fisiológicas
+    // Questionário Detalhado Fisiológico
     weeklyKm: '55',
     weeklyHours: '7.5',
     weeklyDPlus: '2200',
     minHeartRate: '42',
     testedMaxHR: '190',
     avgTrainingHR: '145',
+    effort20Min: '178 bpm / 4:10 min/km',
+    effortClimb: '168 bpm / 7:30 min/km',
+    effort1h: '158 bpm / 4:45 min/km',
     lthr: '172',
     avgPace: '5:10 min/km',
     avgSpeed: '11.6 km/h',
@@ -582,34 +579,16 @@ export default function CoachDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">
+      {/* Navbar Superior */}
       <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
-              <div className="bg-emerald-500 p-2 rounded-xl">
-                <Mountain className="h-5 w-5 text-slate-950" />
-              </div>
-              <span className="text-lg font-black tracking-wider bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
-                TRAILX <span className="text-xs text-emerald-400 font-medium ml-1">COACH</span>
-              </span>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
+            <div className="bg-emerald-500 p-2 rounded-xl">
+              <Mountain className="h-5 w-5 text-slate-950" />
             </div>
-
-            {coachProfile && (
-              <div className="hidden md:flex items-center gap-3">
-                <button
-                  onClick={() => setActiveTab('athletes-list')}
-                  className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-emerald-400 bg-slate-800/50 rounded-xl"
-                >
-                  Atletas ({athletes.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('races-list')}
-                  className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-emerald-400 bg-slate-800/50 rounded-xl"
-                >
-                  Provas & Planos ({races.length})
-                </button>
-              </div>
-            )}
+            <span className="text-lg font-black tracking-wider bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
+              TRAILX <span className="text-xs text-emerald-400 font-medium ml-1">COACH</span>
+            </span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -621,6 +600,9 @@ export default function CoachDashboard() {
                 >
                   <Printer className="h-3.5 w-3.5" /> Exportar PDF
                 </button>
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  Treinador: <strong className="text-slate-200">{coachProfile.full_name || 'Treinador'}</strong>
+                </span>
                 <button
                   onClick={handleLogout}
                   className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 rounded-lg"
@@ -640,6 +622,7 @@ export default function CoachDashboard() {
         </div>
       </nav>
 
+      {/* Landing / Login / Dashboard Principal */}
       <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto print:p-0">
         {view === 'public' && (
           <div className="space-y-16 py-12 text-center max-w-3xl mx-auto">
@@ -649,6 +632,9 @@ export default function CoachDashboard() {
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white">
               Planos de Prova, Postos de Abastecimento e Nutrição
             </h1>
+            <p className="text-slate-400">
+              Faça a gestão dos seus atletas, importe ficheiros .fit/.gz e crie estratégias completas prontas a exportar em PDF.
+            </p>
             <button
               onClick={() => setView('login')}
               className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl inline-flex items-center gap-2 shadow-lg"
@@ -665,24 +651,40 @@ export default function CoachDashboard() {
                 <X className="h-5 w-5" />
               </button>
               <h2 className="text-2xl font-bold text-white mb-4">Login de Treinador</h2>
+              {errorMessage && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  {errorMessage}
+                </div>
+              )}
               <form onSubmit={handleLogin} className="space-y-4">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                  placeholder="Email"
-                />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                  placeholder="Palavra-passe"
-                />
-                <button type="submit" className="w-full py-2.5 bg-emerald-500 text-slate-950 font-bold rounded-xl">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="treinador@trailx.pt"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Palavra-passe</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
                   Entrar
                 </button>
               </form>
@@ -691,240 +693,366 @@ export default function CoachDashboard() {
         )}
 
         {view === 'coach' && coachProfile && (
-          <div className="space-y-8">
-            {activeTab === 'athletes-list' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h2 className="text-xl font-bold text-white">Lista de Atletas ({athletes.length})</h2>
-                  <button
-                    onClick={() => setActiveTab('new-athlete')}
-                    className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" /> Adicionar Atleta
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {athletes.map((ath) => (
-                    <div key={ath.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-1">
-                      <span className="font-bold text-white">{ath.full_name || ath.name}</span>
-                      <p className="text-xs text-slate-400">Peso: {ath.weight ? `${ath.weight} kg` : 'Não definido'}</p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Menu Lateral Estilo Dashboard */}
+            <div className="md:col-span-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2 h-fit print:hidden">
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 px-3 font-bold block mb-2">Menu Principal</span>
+              
+              <button
+                onClick={() => { setActiveTab('athletes-list'); setSelectedAthlete(null); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'athletes-list' || activeTab === 'athlete-profile'
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Users className="h-4 w-4" /> Lista de Atletas ({athletes.length})
+              </button>
+
+              <button
+                onClick={() => setActiveTab('new-athlete')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'new-athlete'
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <UserPlus className="h-4 w-4" /> Registar Novo Atleta
+              </button>
+
+              <button
+                onClick={() => setActiveTab('races-list')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'races-list'
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Trophy className="h-4 w-4" /> Planos & Provas Ativas ({races.length})
+              </button>
+
+              <button
+                onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'new-race'
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Sparkles className="h-4 w-4" /> Criar Nova Prova & GPX
+              </button>
+            </div>
+
+            {/* Conteúdo Dinâmico Central */}
+            <div className="md:col-span-3 space-y-6">
+              {activeTab === 'athletes-list' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <h2 className="text-xl font-bold text-white">Lista de Atletas</h2>
+                    <button
+                      onClick={() => setActiveTab('new-athlete')}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" /> Adicionar Atleta
+                    </button>
+                  </div>
+
+                  {athletes.length === 0 ? (
+                    <div className="p-12 text-center text-slate-500 text-xs italic">
+                      Ainda não tem atletas registados. Use o menu lateral para adicionar o primeiro atleta.
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {athletes.map((ath) => (
+                        <div
+                          key={ath.id}
+                          onClick={() => { setSelectedAthlete(ath); setActiveTab('athlete-profile'); }}
+                          className="bg-slate-950 hover:bg-slate-800/80 border border-slate-800 p-4 rounded-xl space-y-2 cursor-pointer transition-all group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white group-hover:text-emerald-400">{ath.full_name || ath.name}</span>
+                            <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400" />
+                          </div>
+                          <p className="text-xs text-slate-400">Peso atual: <strong className="text-emerald-400">{ath.weight ? `${ath.weight} kg` : 'Não definido'}</strong></p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {activeTab === 'new-athlete' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-2xl mx-auto">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
-                  <button onClick={() => setActiveTab('athletes-list')} className="text-xs text-slate-400">← Voltar</button>
-                </div>
-                <form onSubmit={handleAddAthlete} className="space-y-4">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nome Completo"
-                    value={newAthlete.name}
-                    onChange={(e) => setNewAthlete({ ...newAthlete, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                  />
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Peso Atual (kg) - Importante para Carbo-loading"
-                    value={newAthlete.weight}
-                    onChange={(e) => setNewAthlete({ ...newAthlete, weight: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                  />
-                  <button type="submit" className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs">
-                    Guardar Atleta
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'new-race' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl max-w-4xl mx-auto">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h2 className="text-xl font-bold text-white">Criar Nova Prova & Postos de Abastecimento</h2>
-                  <button onClick={() => setActiveTab('races-list')} className="text-xs text-slate-400">← Voltar</button>
-                </div>
-
-                <form onSubmit={handleSaveRace} className="space-y-8">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activeTab === 'new-athlete' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-2xl mx-auto">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
+                    <button onClick={() => setActiveTab('athletes-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
+                  </div>
+                  <form onSubmit={handleAddAthlete} className="space-y-4">
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Nome da Prova *</label>
+                      <label className="block text-xs text-slate-400 mb-1">Nome Completo *</label>
                       <input
                         type="text"
                         required
-                        placeholder="ex: Penacova Trail Centro"
-                        value={raceForm.name}
-                        onChange={(e) => setRaceForm({ ...raceForm, name: e.target.value })}
+                        placeholder="ex: Fernando Pinto"
+                        value={newAthlete.name}
+                        onChange={(e) => setNewAthlete({ ...newAthlete, name: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Atleta *</label>
-                      <select
-                        value={raceForm.athleteId}
-                        onChange={(e) => setRaceForm({ ...raceForm, athleteId: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                      >
-                        {athletes.map((a) => (
-                          <option key={a.id} value={a.id}>{a.full_name || a.name}</option>
-                        ))}
-                      </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Email</label>
+                        <input
+                          type="email"
+                          placeholder="atleta@email.com"
+                          value={newAthlete.email}
+                          onChange={(e) => setNewAthlete({ ...newAthlete, email: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Peso Atual (kg) * Essencial para Carbo-loading</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="ex: 68.5"
+                          value={newAthlete.weight}
+                          onChange={(e) => setNewAthlete({ ...newAthlete, weight: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
                     </div>
+                    <button type="submit" disabled={addingAthlete} className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs">
+                      {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar Atleta'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {activeTab === 'new-race' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <h2 className="text-xl font-bold text-white">{editingRaceId ? 'Editar Prova' : 'Criar Nova Prova & Abastecimentos'}</h2>
+                    <button onClick={() => setActiveTab('races-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
+                  </div>
+
+                  <form onSubmit={handleSaveRace} className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Nome da Prova *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ex: Penacova Trail Centro"
+                          value={raceForm.name}
+                          onChange={(e) => setRaceForm({ ...raceForm, name: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Atleta Destinatário *</label>
+                        <select
+                          value={raceForm.athleteId}
+                          onChange={(e) => setRaceForm({ ...raceForm, athleteId: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        >
+                          {athletes.map((a) => (
+                            <option key={a.id} value={a.id}>{a.full_name || a.name} {a.weight ? `(${a.weight}kg)` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Localidade (para Meteorologia)</label>
+                        <input
+                          type="text"
+                          value={raceForm.location}
+                          onChange={(e) => setRaceForm({ ...raceForm, location: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Data da Prova</label>
+                        <input
+                          type="date"
+                          value={raceForm.date}
+                          onChange={(e) => setRaceForm({ ...raceForm, date: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Distância (km) *</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          required
+                          value={raceForm.distance}
+                          onChange={(e) => setRaceForm({ ...raceForm, distance: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Desnível D+ (m)</label>
+                        <input
+                          type="number"
+                          value={raceForm.elevation}
+                          onChange={(e) => setRaceForm({ ...raceForm, elevation: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Importação .FIT / .GZ */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-xs font-bold text-emerald-400 uppercase">Importar Ficheiros de Treino (.FIT / .GZ)</span>
+                          <p className="text-[11px] text-slate-400">Carregue ficheiros para preencher automaticamente as métricas fisiológicas.</p>
+                        </div>
+                        <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
+                          <FileSpreadsheet className="h-4 w-4" /> Selecionar Ficheiros
+                          <input type="file" multiple accept=".fit,.gz" onChange={handleActivityFilesUpload} className="hidden" />
+                        </label>
+                      </div>
+                      {analyzingActivity && <p className="text-xs text-emerald-400 animate-pulse">A analisar ficheiros...</p>}
+                    </div>
+
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Localidade (para Meteorologia)</label>
+                      <label className="block text-xs text-slate-400 mb-1">Postos de Abastecimento (Separados por | )</label>
                       <input
                         type="text"
-                        value={raceForm.location}
-                        onChange={(e) => setRaceForm({ ...raceForm, location: e.target.value })}
+                        value={raceForm.aidStationsInput}
+                        onChange={(e) => setRaceForm({ ...raceForm, aidStationsInput: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                        placeholder="ex: KM 12 - Posto de Água | KM 28 - Abastecimento Completo | KM 38 - Base de Vida"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Data</label>
-                      <input
-                        type="date"
-                        value={raceForm.date}
-                        onChange={(e) => setRaceForm({ ...raceForm, date: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Distância (km) *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        required
-                        value={raceForm.distance}
-                        onChange={(e) => setRaceForm({ ...raceForm, distance: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Desnível D+ (m)</label>
-                      <input
-                        type="number"
-                        value={raceForm.elevation}
-                        onChange={(e) => setRaceForm({ ...raceForm, elevation: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                      />
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Postos de Abastecimento (Separados por | )</label>
-                    <input
-                      type="text"
-                      value={raceForm.aidStationsInput}
-                      onChange={(e) => setRaceForm({ ...raceForm, aidStationsInput: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                      placeholder="ex: KM 12 - Água | KM 28 - Completo | KM 38 - Base de Vida"
-                    />
-                  </div>
-
-                  <button type="submit" className="w-full bg-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl text-xs">
-                    Gerar Plano Completo com Abastecimentos & Tempo Estimado
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'races-list' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4 print:hidden">
-                  <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
-                  <div className="flex gap-2">
-                    <button onClick={() => window.print()} className="bg-slate-800 text-emerald-400 px-3 py-1.5 rounded-xl text-xs">
-                      Imprimir / PDF
+                    <button type="submit" className="w-full bg-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl text-xs shadow-lg">
+                      {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Relatório Completo (Meteorologia, Abastecimentos & Carbo-Loading)'}
                     </button>
-                    <button onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }} className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs">
-                      Nova Prova
-                    </button>
-                  </div>
+                  </form>
                 </div>
+              )}
 
-                {races.length === 0 ? (
-                  <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhuma prova planeada.
+              {activeTab === 'races-list' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 print:hidden">
+                    <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
+                    <div className="flex gap-2">
+                      <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-emerald-400 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                        <Printer className="h-3.5 w-3.5" /> Exportar PDF
+                      </button>
+                      <button onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }} className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs">
+                        Nova Prova
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  races.map((race) => {
-                    return (
-                      <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black">
-                        <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-slate-800 pb-4">
-                          <div>
-                            <h3 className="text-2xl font-black text-white print:text-slate-900">{race.name}</h3>
-                            <p className="text-xs text-slate-400 mt-1 flex flex-wrap gap-4">
-                              <span><MapPin className="inline h-3 w-3 mr-1" />{race.location} ({race.date})</span>
-                              <span><Mountain className="inline h-3 w-3 mr-1" />{race.distance} km • {race.elevation}m D+</span>
-                              <span className="text-emerald-400 font-bold"><Clock className="inline h-3 w-3 mr-1" /> Tempo Estimado: {race.estimatedTimeHours}</span>
-                            </p>
-                          </div>
-                          <div className="flex gap-2 print:hidden">
-                            <button onClick={() => handleEditRace(race)} className="p-2 bg-slate-800 text-slate-300 rounded-lg text-xs">Editar</button>
-                            <button onClick={() => handleDeleteRace(race.id)} className="p-2 bg-red-500/10 text-red-400 rounded-lg text-xs">Eliminar</button>
-                          </div>
-                        </div>
 
-                        {/* Abastecimentos / Aid Stations */}
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
-                            <Flag className="h-4 w-4" /> Mapa de Postos de Abastecimento & Estratégia de Prova
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {race.aidStations.map((station) => (
-                              <div key={station.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 print:bg-slate-50 space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-white print:text-slate-900">{station.name}</span>
-                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">KM {station.km}</span>
-                                </div>
-                                <div className="text-[11px] text-slate-400 space-y-1">
-                                  <p><strong>Tipo:</strong> {station.type}</p>
-                                  <p><strong>Hidratos:</strong> {station.targetCarbs}</p>
-                                  <p><strong>Hidratação:</strong> {station.hydrationNotes}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                  {races.length === 0 ? (
+                    <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
+                      Nenhuma prova planeada. Use o menu lateral para criar a primeira.
+                    </div>
+                  ) : (
+                    races.map((race) => {
+                      const assignedAthlete = athletes.find((a) => a.id === race.athleteId);
 
-                        {/* Pré-Prova Carbo-Loading */}
-                        {race.preRaceNutrition && (
-                          <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 print:bg-slate-50 space-y-3">
-                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
-                              <Apple className="h-4 w-4" /> Plano Nutricional de Pré-Prova (Carbo-Loading - 3 Dias Antes)
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white">
-                                <strong className="text-emerald-400 block mb-1">3 Dias Antes</strong>
-                                <span className="text-slate-300">{race.preRaceNutrition.dayMinus3}</span>
+                      return (
+                        <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black">
+                          <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-slate-800 pb-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-2xl font-black text-white print:text-slate-900">{race.name}</h3>
+                                <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                  Atleta: {assignedAthlete?.full_name || assignedAthlete?.name || 'Geral'}
+                                </span>
                               </div>
-                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white">
-                                <strong className="text-emerald-400 block mb-1">2 Dias Antes</strong>
-                                <span className="text-slate-300">{race.preRaceNutrition.dayMinus2}</span>
-                              </div>
-                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white">
-                                <strong className="text-emerald-400 block mb-1">Véspera</strong>
-                                <span className="text-slate-300">{race.preRaceNutrition.dayMinus1}</span>
-                              </div>
-                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white">
-                                <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
-                                <span className="text-slate-300">{race.preRaceNutrition.raceMorning}</span>
-                              </div>
+                              <p className="text-xs text-slate-400 mt-1 flex flex-wrap gap-4">
+                                <span><MapPin className="inline h-3 w-3 mr-1 text-emerald-400" />{race.location} ({race.date})</span>
+                                <span><Mountain className="inline h-3 w-3 mr-1" />{race.distance} km • {race.elevation}m D+</span>
+                                <span className="text-emerald-400 font-bold"><Clock className="inline h-3 w-3 mr-1" /> Tempo Estimado: {race.estimatedTimeHours}</span>
+                              </p>
+                            </div>
+                            <div className="flex gap-2 print:hidden">
+                              <button onClick={() => handleEditRace(race)} className="p-2 bg-slate-800 text-slate-300 rounded-lg text-xs flex items-center gap-1">
+                                <Edit2 className="h-3.5 w-3.5" /> Editar
+                              </button>
+                              <button onClick={() => handleDeleteRace(race.id)} className="p-2 bg-red-500/10 text-red-400 rounded-lg text-xs flex items-center gap-1">
+                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                              </button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
+
+                          {/* Meteorologia Estimada */}
+                          {race.weatherEstimate && (
+                            <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center">
+                              <div className="flex items-center gap-2.5">
+                                <CloudSun className="h-6 w-6 text-blue-400" />
+                                <div>
+                                  <span className="text-xs font-bold text-blue-400 block">Previsão Meteorológica em {race.location}</span>
+                                  <span className="text-xs text-slate-300">Condição: <strong>{race.weatherEstimate.condition}</strong> • Vento: {race.weatherEstimate.wind}</span>
+                                </div>
+                              </div>
+                              <span className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-3 py-1 rounded-lg">
+                                Temp: <strong>{race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax}</strong>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Mapa de Postos de Abastecimento */}
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
+                              <Flag className="h-4 w-4" /> Mapa de Postos de Abastecimento & Estratégia
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {race.aidStations.map((station) => (
+                                <div key={station.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-white">{station.name}</span>
+                                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">KM {station.km}</span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 space-y-1">
+                                    <p><strong>Tipo:</strong> {station.type}</p>
+                                    <p><strong>Hidratos:</strong> {station.targetCarbs}</p>
+                                    <p><strong>Hidratação:</strong> {station.hydrationNotes}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Carbo-Loading 3 Dias Antes */}
+                          {race.preRaceNutrition && (
+                            <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 space-y-3">
+                              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
+                                <Apple className="h-4 w-4" /> Plano Nutricional de Pré-Prova (Carbo-Loading - 3 Dias Antes)
+                              </h4>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                                  <strong className="text-emerald-400 block mb-1">3 Dias Antes</strong>
+                                  <span className="text-slate-300">{race.preRaceNutrition.dayMinus3}</span>
+                                </div>
+                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                                  <strong className="text-emerald-400 block mb-1">2 Dias Antes</strong>
+                                  <span className="text-slate-300">{race.preRaceNutrition.dayMinus2}</span>
+                                </div>
+                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                                  <strong className="text-emerald-400 block mb-1">Véspera</strong>
+                                  <span className="text-slate-300">{race.preRaceNutrition.dayMinus1}</span>
+                                </div>
+                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                                  <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
+                                  <span className="text-slate-300">{race.preRaceNutrition.raceMorning}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
