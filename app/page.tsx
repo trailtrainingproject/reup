@@ -26,8 +26,8 @@ import {
   Scale,
   User,
   ArrowLeft,
-  ChevronRight,
-  LayoutDashboard
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -58,18 +58,23 @@ interface Race {
 
 export default function CoachDashboard() {
   const [view, setView] = useState<'public' | 'login' | 'coach'>('public');
-  const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState<'athletes-list' | 'new-athlete' | 'athlete-profile' | 'races-list' | 'new-race'>('athletes-list');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Estados dos menus Dropdown
+  const [dropdownAthletesOpen, setDropdownAthletesOpen] = useState(false);
+  const [dropdownRacesOpen, setDropdownRacesOpen] = useState(false);
+
   // Utilizador Autenticado (Treinador)
   const [coachProfile, setCoachProfile] = useState<{ id: string; full_name?: string } | null>(null);
 
   // Atletas Vinculados
   const [athletes, setAthletes] = useState<any[]>([]);
+  const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [addingAthlete, setAddingAthlete] = useState(false);
 
   // Formulário do Atleta
@@ -201,7 +206,7 @@ export default function CoachDashboard() {
         weight: ''
       });
       await loadAthletes(coachProfile.id);
-      document.getElementById('section-athletes-list')?.scrollIntoView({ behavior: 'smooth' });
+      setActiveTab('athletes-list');
     } catch (err: any) {
       alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões.'));
     } finally {
@@ -217,6 +222,7 @@ export default function CoachDashboard() {
       if (coachProfile) await loadAthletes(coachProfile.id);
       if (selectedAthlete?.id === athleteId) {
         setSelectedAthlete(null);
+        setActiveTab('athletes-list');
       }
     } catch (err: any) {
       alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as políticas de DELETE.'));
@@ -355,7 +361,7 @@ export default function CoachDashboard() {
       restingHeartRate: '50'
     });
     setGpxFile(null);
-    document.getElementById('section-races-list')?.scrollIntoView({ behavior: 'smooth' });
+    setActiveTab('races-list');
   };
 
   const handleEditRace = (race: Race) => {
@@ -370,30 +376,94 @@ export default function CoachDashboard() {
       maxHeartRate: String(race.maxHeartRate),
       restingHeartRate: String(race.restingHeartRate)
     });
-    document.getElementById('section-new-race')?.scrollIntoView({ behavior: 'smooth' });
+    setActiveTab('new-race');
   };
 
   const handleDeleteRace = (id: string) => {
     setRaces(races.filter(r => r.id !== id));
   };
 
-  const scrollToSection = (id: string) => {
-    setSelectedAthlete(null);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* NAVEGAÇÃO SUPERIOR FIXA */}
-      <nav className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md fixed top-0 w-full z-50">
+      {/* NAVEGAÇÃO SUPERIOR COM DROPDOWN MENU */}
+      <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
-            <div className="bg-emerald-500 p-2 rounded-xl">
-              <Mountain className="h-6 w-6 text-slate-950" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
+              <div className="bg-emerald-500 p-2 rounded-xl">
+                <Mountain className="h-5 w-5 text-slate-950" />
+              </div>
+              <span className="text-lg font-black tracking-wider bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
+                TRAILX <span className="text-xs text-emerald-400 font-medium ml-1">COACH</span>
+              </span>
             </div>
-            <span className="text-xl font-black tracking-wider bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
-              TRAILX <span className="text-xs text-emerald-400 font-medium ml-1">COACH</span>
-            </span>
+
+            {/* DROP-DOWN MENUS PARA TREINADOR AUTENTICADO */}
+            {coachProfile && (
+              <div className="hidden md:flex items-center gap-3">
+                
+                {/* MENU DROP: ATLETAS */}
+                <div className="relative" onMouseLeave={() => setDropdownAthletesOpen(false)}>
+                  <button
+                    onMouseEnter={() => setDropdownAthletesOpen(true)}
+                    onClick={() => setDropdownAthletesOpen(!dropdownAthletesOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-emerald-400 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-all"
+                  >
+                    <Users className="h-4 w-4 text-emerald-400" />
+                    Atletas ({athletes.length})
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+
+                  {dropdownAthletesOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-xl py-2 z-50">
+                      <button
+                        onClick={() => { setActiveTab('athletes-list'); setDropdownAthletesOpen(false); setSelectedAthlete(null); }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80"
+                      >
+                        👥 Lista de Atletas
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('new-athlete'); setDropdownAthletesOpen(false); setSelectedAthlete(null); }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80"
+                      >
+                        ➕ Registar Novo Atleta
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* MENU DROP: PROVAS */}
+                <div className="relative" onMouseLeave={() => setDropdownRacesOpen(false)}>
+                  <button
+                    onMouseEnter={() => setDropdownRacesOpen(true)}
+                    onClick={() => setDropdownRacesOpen(!dropdownRacesOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-emerald-400 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-all"
+                  >
+                    <Trophy className="h-4 w-4 text-emerald-400" />
+                    Provas & Planos ({races.length})
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+
+                  {dropdownRacesOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-52 bg-slate-900 border border-slate-800 rounded-xl shadow-xl py-2 z-50">
+                      <button
+                        onClick={() => { setActiveTab('races-list'); setDropdownRacesOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80"
+                      >
+                        🏁 Planos Ativos
+                      </button>
+                      <button
+                        onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); setDropdownRacesOpen(false); }}
+                        className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80"
+                      >
+                        ✨ Criar Nova Prova & GPX
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -432,7 +502,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Faça a gestão dos seus atletas com menu scroll intuitivo, planeie estratégias de GPX e calcule métricas nutricionais.
+              Faça a gestão dos seus atletas com menu drop-down intuitivo, planeie estratégias de GPX e calcule métricas nutricionais.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -508,172 +578,131 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* PAINEL DO TREINADOR COM MENU SCROLL LATERAL / SUPERIOR */}
+        {/* PAINEL DO TREINADOR */}
         {view === 'coach' && coachProfile && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            
-            {/* MENU LATERAL FIXO (TIPO SCROLL MENU) */}
-            <aside className="lg:col-span-1 space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl sticky top-28 space-y-6 shadow-xl">
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold block mb-1">Menu de Navegação</span>
-                  <h3 className="text-base font-bold text-white">Painel Geral</h3>
+          <div className="space-y-8">
+
+            {/* BOTÕES DE ATALHO RÁPIDO PARA MOBILE (caso o menu drop seja oculto em ecrãs pequenos) */}
+            <div className="flex md:hidden gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+              <button
+                onClick={() => { setActiveTab('athletes-list'); setSelectedAthlete(null); }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg ${activeTab === 'athletes-list' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300'}`}
+              >
+                Atletas
+              </button>
+              <button
+                onClick={() => setActiveTab('races-list')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg ${activeTab === 'races-list' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300'}`}
+              >
+                Provas
+              </button>
+            </div>
+
+            {/* VISTA: PERFIL DE ATLETA SELECIONADO */}
+            {activeTab === 'athlete-profile' && selectedAthlete ? (
+              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+                <button
+                  onClick={() => setActiveTab('athletes-list')}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Voltar à lista de atletas
+                </button>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil Individual</span>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white">{selectedAthlete.full_name || selectedAthlete.name}</h1>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteAthlete(selectedAthlete.id)}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto"
+                  >
+                    <Trash2 className="h-4 w-4" /> Eliminar Atleta
+                  </button>
                 </div>
 
-                <div className="space-y-4">
-                  {/* GRUPO: ATLETAS */}
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 px-2">
-                      <Users className="h-3.5 w-3.5 text-emerald-400" /> Atletas
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-500 block mb-1">Contacto Telefónico</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-emerald-400" /> {selectedAthlete.phone || 'Não definido'}
                     </span>
-                    <button
-                      onClick={() => scrollToSection('section-athletes-list')}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-between"
-                    >
-                      <span>• Lista de Atletas</span>
-                      <span className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{athletes.length}</span>
-                    </button>
-                    <button
-                      onClick={() => scrollToSection('section-new-athlete')}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
-                    >
-                      • Registar Novo Atleta
-                    </button>
                   </div>
 
-                  {/* GRUPO: PROVAS & ESTRATÉGIAS */}
-                  <div className="space-y-1.5 pt-3 border-t border-slate-800">
-                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 px-2">
-                      <Trophy className="h-3.5 w-3.5 text-emerald-400" /> Provas & Estratégias
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-500 block mb-1">Email</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-emerald-400" /> {selectedAthlete.email || 'Não definido'}
                     </span>
-                    <button
-                      onClick={() => scrollToSection('section-races-list')}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-between"
-                    >
-                      <span>• Planos Ativos</span>
-                      <span className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{races.length}</span>
-                    </button>
-                    <button
-                      onClick={() => scrollToSection('section-new-race')}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
-                    >
-                      • Nova Prova & GPX
-                    </button>
                   </div>
+
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-500 block mb-1">Idade & Género</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2">
+                      <User className="h-4 w-4 text-emerald-400" /> {selectedAthlete.age ? `${selectedAthlete.age} anos` : '-'} ({selectedAthlete.gender || '-'})
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-500 block mb-1">Peso Atual</span>
+                    <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+                      <Scale className="h-4 w-4" /> {selectedAthlete.weight ? `${selectedAthlete.weight} kg` : 'Não definido'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800">
+                  <h3 className="text-base font-bold text-white mb-3">Provas Atribuídas a este Atleta</h3>
+                  {races.filter(r => r.athleteId === selectedAthlete.id).length === 0 ? (
+                    <p className="text-xs text-slate-500 italic">Nenhuma prova atribuída a este atleta de momento.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {races.filter(r => r.athleteId === selectedAthlete.id).map(r => (
+                        <div key={r.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                          <div>
+                            <span className="font-bold text-white text-sm block">{r.name}</span>
+                            <span className="text-xs text-slate-400">{r.distance} km • {r.elevation}m D+</span>
+                          </div>
+                          <button
+                            onClick={() => { handleEditRace(r); }}
+                            className="text-xs text-emerald-400 hover:underline"
+                          >
+                            Ver Plano
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            </aside>
+            ) : null}
 
-            {/* CONTEÚDO PRINCIPAL (SCROLL CONTÍNUO) */}
-            <div className="lg:col-span-3 space-y-12">
-              
-              {/* VISTA DE PERFIL DE ATLETA SELECIONADO (SE HOUVER) */}
-              {selectedAthlete ? (
-                <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
-                  <button
-                    onClick={() => setSelectedAthlete(null)}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Voltar à listagem geral
-                  </button>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                    <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil Individual</span>
-                      <h1 className="text-2xl sm:text-3xl font-black text-white">{selectedAthlete.full_name || selectedAthlete.name}</h1>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteAthlete(selectedAthlete.id)}
-                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto"
-                    >
-                      <Trash2 className="h-4 w-4" /> Eliminar Atleta
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Contacto Telefónico</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-emerald-400" /> {selectedAthlete.phone || 'Não definido'}
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Email</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-emerald-400" /> {selectedAthlete.email || 'Não definido'}
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Idade & Género</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <User className="h-4 w-4 text-emerald-400" /> {selectedAthlete.age ? `${selectedAthlete.age} anos` : '-'} ({selectedAthlete.gender || '-'})
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Peso Atual</span>
-                      <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
-                        <Scale className="h-4 w-4" /> {selectedAthlete.weight ? `${selectedAthlete.weight} kg` : 'Não definido'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-800">
-                    <h3 className="text-base font-bold text-white mb-3">Provas Atribuídas a este Atleta</h3>
-                    {races.filter(r => r.athleteId === selectedAthlete.id).length === 0 ? (
-                      <p className="text-xs text-slate-500 italic">Nenhuma prova atribuída a este atleta de momento.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {races.filter(r => r.athleteId === selectedAthlete.id).map(r => (
-                          <div key={r.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
-                            <div>
-                              <span className="font-bold text-white text-sm block">{r.name}</span>
-                              <span className="text-xs text-slate-400">{r.distance} km • {r.elevation}m D+</span>
-                            </div>
-                            <button
-                              onClick={() => {
-                                handleEditRace(r);
-                                setSelectedAthlete(null);
-                              }}
-                              className="text-xs text-emerald-400 hover:underline"
-                            >
-                              Ver Plano
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* SECÇÃO 1: LISTA DE ATLETAS */}
-              <section id="section-athletes-list" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+            {/* VISTA: LISTA DE ATLETAS */}
+            {activeTab === 'athletes-list' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Gestão de Equipa</span>
                     <h2 className="text-xl font-bold text-white">Lista de Atletas ({athletes.length})</h2>
                   </div>
                   <button
-                    onClick={() => scrollToSection('section-new-athlete')}
+                    onClick={() => setActiveTab('new-athlete')}
                     className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
                   >
-                    <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                    <UserPlus className="h-3.5 w-3.5" /> Adicionar Atleta
                   </button>
                 </div>
 
                 {athletes.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs italic">
-                    Ainda não tem atletas registados. Utilize o formulário abaixo para adicionar o primeiro.
+                  <div className="p-12 text-center text-slate-500 text-xs italic">
+                    Ainda não tem atletas registados. Selecione "Atletas > Registar Novo Atleta" no menu superior.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {athletes.map((ath) => (
                       <div
                         key={ath.id}
-                        onClick={() => setSelectedAthlete(ath)}
+                        onClick={() => { setSelectedAthlete(ath); setActiveTab('athlete-profile'); }}
                         className="bg-slate-950 hover:bg-slate-800/80 border border-slate-800 p-4 rounded-xl space-y-2 cursor-pointer transition-all group shadow"
                       >
                         <div className="flex items-center justify-between">
@@ -691,13 +720,18 @@ export default function CoachDashboard() {
                     ))}
                   </div>
                 )}
-              </section>
+              </div>
+            )}
 
-              {/* SECÇÃO 2: REGISTAR NOVO ATLETA */}
-              <section id="section-new-athlete" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
-                <div className="border-b border-slate-800 pb-4">
-                  <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Novo Registo</span>
-                  <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
+            {/* VISTA: REGISTAR NOVO ATLETA */}
+            {activeTab === 'new-athlete' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-2xl mx-auto">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Novo Registo</span>
+                    <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
+                  </div>
+                  <button onClick={() => setActiveTab('athletes-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
                 </div>
 
                 <form onSubmit={handleAddAthlete} className="space-y-4">
@@ -791,10 +825,12 @@ export default function CoachDashboard() {
                     Guardar Atleta
                   </button>
                 </form>
-              </section>
+              </div>
+            )}
 
-              {/* SECÇÃO 3: NOVA PROVA & GPX */}
-              <section id="section-new-race" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+            {/* VISTA: NOVA PROVA & GPX */}
+            {activeTab === 'new-race' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-3xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Planeamento</span>
@@ -802,26 +838,7 @@ export default function CoachDashboard() {
                       {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Estratégia GPX'}
                     </h2>
                   </div>
-                  {editingRaceId && (
-                    <button
-                      onClick={() => {
-                        setEditingRaceId(null);
-                        setRaceForm({
-                          name: '',
-                          date: new Date().toISOString().split('T')[0],
-                          distance: '',
-                          elevation: '',
-                          athleteId: athletes[0]?.id || '',
-                          targetCarbsPerHour: '60',
-                          maxHeartRate: '185',
-                          restingHeartRate: '50'
-                        });
-                      }}
-                      className="text-xs text-slate-400 hover:text-white"
-                    >
-                      Cancelar Edição
-                    </button>
-                  )}
+                  <button onClick={() => setActiveTab('races-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
                 </div>
 
                 <form onSubmit={handleSaveRace} className="space-y-6">
@@ -846,7 +863,7 @@ export default function CoachDashboard() {
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                       >
                         {athletes.length === 0 ? (
-                          <option value="">Adicione primeiro um atleta na secção anterior</option>
+                          <option value="">Adicione primeiro um atleta no menu superior</option>
                         ) : (
                           athletes.map((a) => (
                             <option key={a.id} value={a.id}>
@@ -944,20 +961,28 @@ export default function CoachDashboard() {
                     {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Plano Nutricional & Pacing GPX'}
                   </button>
                 </form>
-              </section>
+              </div>
+            )}
 
-              {/* SECÇÃO 4: PLANOS DE PROVA ATIVOS (LISTA) */}
-              <section id="section-races-list" className="space-y-6">
+            {/* VISTA: PLANOS DE PROVA ATIVOS (LISTA) */}
+            {activeTab === 'races-list' && (
+              <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Histórico</span>
                     <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
                   </div>
+                  <button
+                    onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> Nova Prova
+                  </button>
                 </div>
 
                 {races.length === 0 ? (
                   <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhuma prova planeada. Utilize a secção "Nova Prova & GPX" acima para gerar a estratégia.
+                    Nenhuma prova planeada. Selecione "Provas > Criar Nova Prova & GPX" no menu superior.
                   </div>
                 ) : (
                   races.map((race) => {
@@ -1031,9 +1056,9 @@ export default function CoachDashboard() {
                     );
                   })
                 )}
-              </section>
+              </div>
+            )}
 
-            </div>
           </div>
         )}
       </main>
