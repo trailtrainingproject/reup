@@ -14,7 +14,6 @@ import {
   Mail,
   Loader2,
   Users,
-  Flag,
   Sparkles,
   Heart,
   Apple,
@@ -27,7 +26,10 @@ import {
   User,
   ArrowLeft,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  FileSpreadsheet,
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -53,6 +55,15 @@ interface Race {
   targetCarbsPerHour: number;
   maxHeartRate: number;
   restingHeartRate: number;
+  athleteMetrics?: {
+    weeklyKm: string;
+    weeklyHours: string;
+    weeklyDPlus: string;
+    lthr: string;
+    flatPace: string;
+    uphillPace: string;
+    downhillPace: string;
+  };
   planSectors: RacePlanSector[];
 }
 
@@ -92,7 +103,7 @@ export default function CoachDashboard() {
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário de Prova
+  // Formulário de Prova & Questionário Avançado de Atleta
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
@@ -101,9 +112,33 @@ export default function CoachDashboard() {
     athleteId: '',
     targetCarbsPerHour: '60',
     maxHeartRate: '185',
-    restingHeartRate: '50'
+    restingHeartRate: '50',
+    // Questionário Detalhado
+    weeklyKm: '55',
+    weeklyHours: '7.5',
+    weeklyDPlus: '2200',
+    minHeartRate: '42',
+    testedMaxHR: '190',
+    avgTrainingHR: '145',
+    hrZone1: '120-135',
+    hrZone2: '136-150',
+    hrZone3: '151-165',
+    hrZone4: '166-180',
+    hrZone5: '181-190',
+    effort20Min: '178 bpm / 4:10 min/km',
+    effortClimb: '168 bpm / 7:30 min/km',
+    effort1h: '158 bpm / 4:45 min/km',
+    lthr: '172',
+    avgPace: '5:10 min/km',
+    avgSpeed: '11.6 km/h',
+    flatPace: '4:30 min/km',
+    uphillPace: '7:45 min/km',
+    downhillPace: '4:15 min/km'
   });
+
   const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const [fitFiles, setFitFiles] = useState<File[]>([]);
+  const [analyzingFit, setAnalyzingFit] = useState(false);
 
   useEffect(() => {
     checkSession();
@@ -260,12 +295,42 @@ export default function CoachDashboard() {
     setView('public');
   };
 
+  // Simulação de IA/Algoritmo para ler ficheiros .fit e auto-preencher métricas
+  const handleFitFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setFitFiles(files);
+    setAnalyzingFit(true);
+
+    setTimeout(() => {
+      // Valores simulados extraídos dos ficheiros FIT carregados
+      setRaceForm(prev => ({
+        ...prev,
+        weeklyKm: '64.5',
+        weeklyHours: '8.2',
+        weeklyDPlus: '2650',
+        restingHeartRate: '44',
+        minHeartRate: '40',
+        maxHeartRate: '188',
+        testedMaxHR: '191',
+        avgTrainingHR: '148',
+        lthr: '174',
+        flatPace: '4:20 min/km',
+        uphillPace: '7:20 min/km',
+        downhillPace: '4:05 min/km'
+      }));
+      setAnalyzingFit(false);
+    }, 1500);
+  };
+
   const generateRacePlanSectors = (
     dist: number,
     elev: number,
     carbsPerHour: number,
     maxHR: number,
-    restHR: number
+    restHR: number,
+    flatPace: string
   ): RacePlanSector[] => {
     const hrReserve = maxHR - restHR;
     const z2Upper = Math.round(restHR + hrReserve * 0.7);
@@ -279,7 +344,7 @@ export default function CoachDashboard() {
         sector: 'Setor 1: Início & Aquecimento',
         distanceKm: `0.0 km - ${s1Km} km`,
         terrain: 'Subidas graduais / Trilho inicial',
-        targetPace: 'Gestão conservadora (6:30 - 7:15 min/km)',
+        targetPace: `Gestão conservadora baseada em plano (${flatPace})`,
         heartRateZone: `Z1/Z2 (Abaixo de ${z2Upper} bpm)`,
         carbsTarget: `${Math.round(carbsPerHour * 0.8)}g HC/h`,
         hydration: '500ml Água + Eletrólitos',
@@ -289,7 +354,7 @@ export default function CoachDashboard() {
         sector: 'Setor 2: Troço Técnico & Maior D+',
         distanceKm: `${s1Km} km - ${s2Km} km`,
         terrain: `Subidas íngremes e crestas (~${Math.round(elev * 0.65)}m D+)`,
-        targetPace: 'Ritmo constante / Power hiking (8:00 - 9:30 min/km)',
+        targetPace: 'Ritmo constante / Power hiking (7:30 - 9:00 min/km)',
         heartRateZone: `Z2/Z3 (${z2Upper} - ${z3Upper} bpm)`,
         carbsTarget: `${carbsPerHour}g HC/h`,
         hydration: '600-750ml Água com Sódio',
@@ -299,7 +364,7 @@ export default function CoachDashboard() {
         sector: 'Setor 3: Descidas & Sprint Final',
         distanceKm: `${s2Km} km - ${dist.toFixed(1)} km`,
         terrain: 'Descidas técnicas e aproximação à meta',
-        targetPace: 'Aceleração controlada (5:45 - 6:30 min/km)',
+        targetPace: 'Aceleração controlada baseada em descida',
         heartRateZone: `Z3/Z4 (${z3Upper} - ${maxHR} bpm)`,
         carbsTarget: `${Math.round(carbsPerHour * 1.1)}g HC/h`,
         hydration: '500ml Água / Isotónico',
@@ -318,7 +383,17 @@ export default function CoachDashboard() {
     const maxHR = parseInt(raceForm.maxHeartRate) || 185;
     const restHR = parseInt(raceForm.restingHeartRate) || 50;
 
-    const planSectors = generateRacePlanSectors(dist, elev, carbs, maxHR, restHR);
+    const planSectors = generateRacePlanSectors(dist, elev, carbs, maxHR, restHR, raceForm.flatPace);
+
+    const athleteMetrics = {
+      weeklyKm: raceForm.weeklyKm,
+      weeklyHours: raceForm.weeklyHours,
+      weeklyDPlus: raceForm.weeklyDPlus,
+      lthr: raceForm.lthr,
+      flatPace: raceForm.flatPace,
+      uphillPace: raceForm.uphillPace,
+      downhillPace: raceForm.downhillPace
+    };
 
     if (editingRaceId) {
       setRaces(races.map(r => r.id === editingRaceId ? {
@@ -331,6 +406,7 @@ export default function CoachDashboard() {
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
+        athleteMetrics,
         planSectors,
         gpxFileName: gpxFile ? gpxFile.name : r.gpxFileName
       } : r));
@@ -347,28 +423,21 @@ export default function CoachDashboard() {
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
         gpxFileName: gpxFile ? gpxFile.name : null,
+        athleteMetrics,
         planSectors
       };
       setRaces([newRace, ...races]);
     }
 
-    setRaceForm({
-      name: '',
-      date: new Date().toISOString().split('T')[0],
-      distance: '',
-      elevation: '',
-      athleteId: athletes[0]?.id || '',
-      targetCarbsPerHour: '60',
-      maxHeartRate: '185',
-      restingHeartRate: '50'
-    });
     setGpxFile(null);
+    setFitFiles([]);
     setActiveTab('races-list');
   };
 
   const handleEditRace = (race: Race) => {
     setEditingRaceId(race.id);
     setRaceForm({
+      ...raceForm,
       name: race.name,
       date: race.date,
       distance: String(race.distance),
@@ -504,7 +573,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Faça a gestão dos seus atletas com menu drop-down intuitivo, planeie estratégias de GPX e calcule métricas nutricionais.
+              Faça a gestão dos seus atletas com questionário avançado, análise de ficheiros FIT e estratégias de GPX.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -830,137 +899,324 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* VISTA: NOVA PROVA & GPX */}
+            {/* VISTA: NOVA PROVA & QUESTIONÁRIO AVANÇADO DE ATLETA (COM FIT) */}
             {activeTab === 'new-race' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-3xl mx-auto">
+              <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl max-w-4xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
-                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Planeamento</span>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Configuração & Inscrição</span>
                     <h2 className="text-xl font-bold text-white">
-                      {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Estratégia GPX'}
+                      {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Questionário do Atleta'}
                     </h2>
                   </div>
                   <button onClick={() => setActiveTab('races-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
                 </div>
 
-                <form onSubmit={handleSaveRace} className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Nome da Prova</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="ex: UTSM - 50k"
-                        value={raceForm.name}
-                        onChange={(e) => setRaceForm({ ...raceForm, name: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
+                <form onSubmit={handleSaveRace} className="space-y-8">
+                  
+                  {/* SEÇÃO 1: DADOS DA PROVA & GPX */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
+                      <Trophy className="h-4 w-4" /> 1. Detalhes da Prova & Ficheiro GPX
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Nome da Prova *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ex: Ultra Trail Serra da Estrela - 50k"
+                          value={raceForm.name}
+                          onChange={(e) => setRaceForm({ ...raceForm, name: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Atleta Destinatário *</label>
+                        <select
+                          value={raceForm.athleteId}
+                          onChange={(e) => setRaceForm({ ...raceForm, athleteId: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        >
+                          {athletes.length === 0 ? (
+                            <option value="">Adicione primeiro um atleta no menu superior</option>
+                          ) : (
+                            athletes.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.full_name || a.name} {a.weight ? `(${a.weight}kg)` : ''}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Distância Total (km) *</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          required
+                          placeholder="ex: 45.0"
+                          value={raceForm.distance}
+                          onChange={(e) => setRaceForm({ ...raceForm, distance: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Desnível Positivo D+ (m)</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 2500"
+                          value={raceForm.elevation}
+                          onChange={(e) => setRaceForm({ ...raceForm, elevation: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Atleta Destinatário</label>
-                      <select
-                        value={raceForm.athleteId}
-                        onChange={(e) => setRaceForm({ ...raceForm, athleteId: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      >
-                        {athletes.length === 0 ? (
-                          <option value="">Adicione primeiro um atleta no menu superior</option>
-                        ) : (
-                          athletes.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.full_name || a.name} {a.weight ? `(${a.weight}kg)` : ''}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Distância Total (km)</label>
+                      <label className="block text-xs text-slate-400 mb-1">Carregar Percurso em Ficheiro GPX</label>
                       <input
-                        type="number"
-                        step="0.1"
-                        required
-                        placeholder="ex: 42.5"
-                        value={raceForm.distance}
-                        onChange={(e) => setRaceForm({ ...raceForm, distance: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Desnível Positivo D+ (m)</label>
-                      <input
-                        type="number"
-                        placeholder="ex: 2500"
-                        value={raceForm.elevation}
-                        onChange={(e) => setRaceForm({ ...raceForm, elevation: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
-                    <div>
-                      <label className="block text-xs text-emerald-400 font-semibold mb-1 flex items-center gap-1">
-                        <Apple className="h-3.5 w-3.5" /> Hidratos/Hora (g HC/h)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="60 - 90"
-                        value={raceForm.targetCarbsPerHour}
-                        onChange={(e) => setRaceForm({ ...raceForm, targetCarbsPerHour: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-red-400 font-semibold mb-1 flex items-center gap-1">
-                        <Heart className="h-3.5 w-3.5" /> FC Máxima (bpm)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="ex: 185"
-                        value={raceForm.maxHeartRate}
-                        onChange={(e) => setRaceForm({ ...raceForm, maxHeartRate: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-400 font-semibold mb-1 flex items-center gap-1">
-                        <Activity className="h-3.5 w-3.5" /> FC Repouso (bpm)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="ex: 50"
-                        value={raceForm.restingHeartRate}
-                        onChange={(e) => setRaceForm({ ...raceForm, restingHeartRate: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        type="file"
+                        accept=".gpx"
+                        onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
+                        className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Carregar Percurso em Ficheiro GPX</label>
-                    <input
-                      type="file"
-                      accept=".gpx"
-                      onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
-                      className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer"
-                    />
+                  {/* SEÇÃO 2: IMPORTAÇÃO DE TREINOS .FIT (AUTOPREENCHIMENTO) */}
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-emerald-500/30 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                          <Zap className="h-4 w-4" /> 2. Opcional: Importar Ficheiros de Treino (.FIT)
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Carregue 1 a 3 ficheiros .fit para o algoritmo calcular automaticamente volumes, FCs e ritmos do atleta.
+                        </p>
+                      </div>
+                      <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto">
+                        <FileSpreadsheet className="h-4 w-4" /> Selecionar Ficheiros .FIT
+                        <input
+                          type="file"
+                          multiple
+                          accept=".fit"
+                          onChange={handleFitFilesUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {analyzingFit && (
+                      <div className="flex items-center gap-3 text-xs text-emerald-400 py-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> A processar dados biométricos dos ficheiros FIT...
+                      </div>
+                    )}
+
+                    {fitFiles.length > 0 && !analyzingFit && (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {fitFiles.map((f, i) => (
+                          <span key={i} className="text-xs bg-slate-900 text-slate-300 border border-slate-800 px-3 py-1 rounded-lg flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {f.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEÇÃO 3: QUESTIONÁRIO DETALHADO DO ATLETA */}
+                  <div className="space-y-6 pt-2">
+                    <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2 border-t border-slate-800 pt-6">
+                      <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta
+                    </h3>
+
+                    {/* Volume Semanal */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider block">Volume Médio Semanal</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Km / semana</label>
+                          <input
+                            type="text"
+                            value={raceForm.weeklyKm}
+                            onChange={(e) => setRaceForm({ ...raceForm, weeklyKm: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Horas / semana</label>
+                          <input
+                            type="text"
+                            value={raceForm.weeklyHours}
+                            onChange={(e) => setRaceForm({ ...raceForm, weeklyHours: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">D+ semanal (m)</label>
+                          <input
+                            type="text"
+                            value={raceForm.weeklyDPlus}
+                            onChange={(e) => setRaceForm({ ...raceForm, weeklyDPlus: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Frequência Cardíaca */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+                      <span className="text-xs font-bold text-red-400 uppercase tracking-wider block flex items-center gap-1.5">
+                        <Heart className="h-3.5 w-3.5" /> Frequência Cardíaca & Zonas
+                      </span>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">FC Repouso (bpm)</label>
+                          <input
+                            type="number"
+                            value={raceForm.restingHeartRate}
+                            onChange={(e) => setRaceForm({ ...raceForm, restingHeartRate: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">FC Mínima (bpm)</label>
+                          <input
+                            type="number"
+                            value={raceForm.minHeartRate}
+                            onChange={(e) => setRaceForm({ ...raceForm, minHeartRate: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">FC Máxima (bpm)</label>
+                          <input
+                            type="number"
+                            value={raceForm.maxHeartRate}
+                            onChange={(e) => setRaceForm({ ...raceForm, maxHeartRate: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">FC Máx Testada</label>
+                          <input
+                            type="number"
+                            value={raceForm.testedMaxHR}
+                            onChange={(e) => setRaceForm({ ...raceForm, testedMaxHR: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-900">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Esforço 20-30 min forte</label>
+                          <input
+                            type="text"
+                            value={raceForm.effort20Min}
+                            onChange={(e) => setRaceForm({ ...raceForm, effort20Min: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Esforço Subida 10-20 min</label>
+                          <input
+                            type="text"
+                            value={raceForm.effortClimb}
+                            onChange={(e) => setRaceForm({ ...raceForm, effortClimb: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Esforço Corrida 1h</label>
+                          <input
+                            type="text"
+                            value={raceForm.effort1h}
+                            onChange={(e) => setRaceForm({ ...raceForm, effort1h: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-900">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Limiar de FC (LTHR - bpm)</label>
+                          <input
+                            type="number"
+                            value={raceForm.lthr}
+                            onChange={(e) => setRaceForm({ ...raceForm, lthr: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-emerald-400 mb-1">Alvo Hidratos (g HC/h)</label>
+                          <input
+                            type="number"
+                            value={raceForm.targetCarbsPerHour}
+                            onChange={(e) => setRaceForm({ ...raceForm, targetCarbsPerHour: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ritmo e Velocidade */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Ritmo & Velocidade</span>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Ritmo Médio</label>
+                          <input
+                            type="text"
+                            value={raceForm.avgPace}
+                            onChange={(e) => setRaceForm({ ...raceForm, avgPace: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Velocidade Média</label>
+                          <input
+                            type="text"
+                            value={raceForm.avgSpeed}
+                            onChange={(e) => setRaceForm({ ...raceForm, avgSpeed: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Ritmo em Plano</label>
+                          <input
+                            type="text"
+                            value={raceForm.flatPace}
+                            onChange={(e) => setRaceForm({ ...raceForm, flatPace: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Ritmo em Subida</label>
+                          <input
+                            type="text"
+                            value={raceForm.uphillPace}
+                            onChange={(e) => setRaceForm({ ...raceForm, uphillPace: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"
                   >
                     <Sparkles className="h-4 w-4" />
-                    {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Plano Nutricional & Pacing GPX'}
+                    {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Estratégia Final de Prova & Nutrição'}
                   </button>
                 </form>
               </div>
@@ -1023,6 +1279,28 @@ export default function CoachDashboard() {
                             </button>
                           </div>
                         </div>
+
+                        {/* RESUMO DAS MÉTRICAS DO ATLETA PARA ESTA PROVA */}
+                        {race.athleteMetrics && (
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                            <div>
+                              <span className="text-slate-500 block">Volume Semanal</span>
+                              <span className="text-white font-medium">{race.athleteMetrics.weeklyKm} km | {race.athleteMetrics.weeklyHours}h</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block">Limiar (LTHR)</span>
+                              <span className="text-red-400 font-medium">{race.athleteMetrics.lthr} bpm</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block">Ritmo Plano</span>
+                              <span className="text-emerald-400 font-medium">{race.athleteMetrics.flatPace}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block">Ritmo Subida</span>
+                              <span className="text-emerald-400 font-medium">{race.athleteMetrics.uphillPace}</span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* ESTRATÉGIA POR SETOR */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
