@@ -23,11 +23,11 @@ import {
   MapPin,
   UserPlus,
   Phone,
-  Calendar,
   Scale,
   User,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  LayoutDashboard
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -58,7 +58,7 @@ interface Race {
 
 export default function CoachDashboard() {
   const [view, setView] = useState<'public' | 'login' | 'coach'>('public');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'athletes' | 'new-athlete' | 'athlete-profile' | 'races' | 'new-race'>('dashboard');
+  const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +70,6 @@ export default function CoachDashboard() {
 
   // Atletas Vinculados
   const [athletes, setAthletes] = useState<any[]>([]);
-  const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [addingAthlete, setAddingAthlete] = useState(false);
 
   // Formulário do Atleta
@@ -88,7 +87,7 @@ export default function CoachDashboard() {
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário de Criação/Edição de Prova
+  // Formulário de Prova
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
@@ -202,7 +201,7 @@ export default function CoachDashboard() {
         weight: ''
       });
       await loadAthletes(coachProfile.id);
-      setActiveTab('athletes');
+      document.getElementById('section-athletes-list')?.scrollIntoView({ behavior: 'smooth' });
     } catch (err: any) {
       alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões.'));
     } finally {
@@ -218,7 +217,6 @@ export default function CoachDashboard() {
       if (coachProfile) await loadAthletes(coachProfile.id);
       if (selectedAthlete?.id === athleteId) {
         setSelectedAthlete(null);
-        setActiveTab('athletes');
       }
     } catch (err: any) {
       alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as políticas de DELETE.'));
@@ -357,7 +355,7 @@ export default function CoachDashboard() {
       restingHeartRate: '50'
     });
     setGpxFile(null);
-    setActiveTab('races');
+    document.getElementById('section-races-list')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleEditRace = (race: Race) => {
@@ -372,17 +370,22 @@ export default function CoachDashboard() {
       maxHeartRate: String(race.maxHeartRate),
       restingHeartRate: String(race.restingHeartRate)
     });
-    setActiveTab('new-race');
+    document.getElementById('section-new-race')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleDeleteRace = (id: string) => {
     setRaces(races.filter(r => r.id !== id));
   };
 
+  const scrollToSection = (id: string) => {
+    setSelectedAthlete(null);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* NAVEGAÇÃO SUPERIOR */}
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md fixed top-0 w-full z-50">
+      {/* NAVEGAÇÃO SUPERIOR FIXA */}
+      <nav className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md fixed top-0 w-full z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
             <div className="bg-emerald-500 p-2 rounded-xl">
@@ -418,7 +421,7 @@ export default function CoachDashboard() {
         </div>
       </nav>
 
-      <main className="pt-24 pb-12 px-4 max-w-7xl mx-auto">
+      <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
         {/* LANDING PAGE */}
         {view === 'public' && (
           <div className="space-y-16 py-12 text-center max-w-3xl mx-auto">
@@ -429,7 +432,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Faça a gestão dos seus atletas, planeie estratégias de GPX e calcule métricas nutricionais por setor.
+              Faça a gestão dos seus atletas com menu scroll intuitivo, planeie estratégias de GPX e calcule métricas nutricionais.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -505,186 +508,78 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* PAINEL DO TREINADOR COM MENU POR ABAS */}
+        {/* PAINEL DO TREINADOR COM MENU SCROLL LATERAL / SUPERIOR */}
         {view === 'coach' && coachProfile && (
-          <div className="space-y-8">
-            {/* MENU DE NAVEGAÇÃO DO TREINADOR */}
-            <div className="bg-slate-900 border border-slate-800 p-2 rounded-2xl flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    activeTab === 'dashboard' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  🏠 Início
-                </button>
-                <button
-                  onClick={() => setActiveTab('athletes')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    activeTab === 'athletes' || activeTab === 'athlete-profile' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  👥 Atletas ({athletes.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('new-athlete')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    activeTab === 'new-athlete' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  ➕ Novo Atleta
-                </button>
-                <button
-                  onClick={() => setActiveTab('races')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    activeTab === 'races' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  🏁 Provas & Planos ({races.length})
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingRaceId(null);
-                    setActiveTab('new-race');
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    activeTab === 'new-race' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  ✨ Nova Prova GPX
-                </button>
-              </div>
-            </div>
-
-            {/* TAB: DASHBOARD / INÍCIO */}
-            {activeTab === 'dashboard' && (
-              <div className="space-y-6">
-                <div className="border-b border-slate-800 pb-4">
-                  <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-                  <p className="text-xs text-slate-400">Visão geral da sua equipa e planos de treino ativos.</p>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            
+            {/* MENU LATERAL FIXO (TIPO SCROLL MENU) */}
+            <aside className="lg:col-span-1 space-y-6">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl sticky top-28 space-y-6 shadow-xl">
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold block mb-1">Menu de Navegação</span>
+                  <h3 className="text-base font-bold text-white">Painel Geral</h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between space-y-4">
-                    <div>
-                      <h2 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                        <Users className="h-5 w-5" /> Atletas Registados
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-1">Tem atualmente {athletes.length} atletas vinculados.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setActiveTab('athletes')}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all"
-                      >
-                        Ver Lista
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('new-athlete')}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all"
-                      >
-                        Registar Atleta
-                      </button>
-                    </div>
+                <div className="space-y-4">
+                  {/* GRUPO: ATLETAS */}
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 px-2">
+                      <Users className="h-3.5 w-3.5 text-emerald-400" /> Atletas
+                    </span>
+                    <button
+                      onClick={() => scrollToSection('section-athletes-list')}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-between"
+                    >
+                      <span>• Lista de Atletas</span>
+                      <span className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{athletes.length}</span>
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('section-new-athlete')}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+                    >
+                      • Registar Novo Atleta
+                    </button>
                   </div>
 
-                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between space-y-4">
-                    <div>
-                      <h2 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                        <Trophy className="h-5 w-5" /> Provas & Estratégias
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-1">{races.length} planos de prova ativos gerados.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setActiveTab('races')}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all"
-                      >
-                        Ver Provas
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingRaceId(null);
-                          setActiveTab('new-race');
-                        }}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all"
-                      >
-                        Criar Nova Prova
-                      </button>
-                    </div>
+                  {/* GRUPO: PROVAS & ESTRATÉGIAS */}
+                  <div className="space-y-1.5 pt-3 border-t border-slate-800">
+                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 px-2">
+                      <Trophy className="h-3.5 w-3.5 text-emerald-400" /> Provas & Estratégias
+                    </span>
+                    <button
+                      onClick={() => scrollToSection('section-races-list')}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-between"
+                    >
+                      <span>• Planos Ativos</span>
+                      <span className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{races.length}</span>
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('section-new-race')}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+                    >
+                      • Nova Prova & GPX
+                    </button>
                   </div>
                 </div>
               </div>
-            )}
+            </aside>
 
-            {/* TAB: LISTA DE ATLETAS */}
-            {activeTab === 'athletes' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <div>
-                    <h1 className="text-2xl font-bold text-white">Lista de Atletas</h1>
-                    <p className="text-xs text-slate-400">Clique num atleta para ver o perfil detalhado.</p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('new-athlete')}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all"
-                  >
-                    <UserPlus className="h-4 w-4" /> Novo Atleta
-                  </button>
-                </div>
-
-                {athletes.length === 0 ? (
-                  <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhum atleta registado. Clique em "Novo Atleta" para começar.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {athletes.map((ath) => (
-                      <div
-                        key={ath.id}
-                        onClick={() => {
-                          setSelectedAthlete(ath);
-                          setActiveTab('athlete-profile');
-                        }}
-                        className="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 p-5 rounded-2xl space-y-3 cursor-pointer transition-all group shadow-md"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-white text-base group-hover:text-emerald-400 transition-colors">
-                            {ath.full_name || ath.name}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-transform group-hover:translate-x-1" />
-                        </div>
-
-                        <div className="text-xs text-slate-400 space-y-1 pt-1 border-t border-slate-800/60">
-                          {ath.email && <div>Email: {ath.email}</div>}
-                          <div className="flex gap-3 pt-1 text-slate-300">
-                            {ath.age && <span>{ath.age} anos</span>}
-                            {ath.gender && <span>• {ath.gender}</span>}
-                            {ath.weight && <span className="text-emerald-400 font-medium">• {ath.weight} kg</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB: PERFIL DETALHADO DO ATLETA */}
-            {activeTab === 'athlete-profile' && selectedAthlete && (
-              <div className="space-y-6">
-                <button
-                  onClick={() => setActiveTab('athletes')}
-                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Voltar à lista de atletas
-                </button>
-
+            {/* CONTEÚDO PRINCIPAL (SCROLL CONTÍNUO) */}
+            <div className="lg:col-span-3 space-y-12">
+              
+              {/* VISTA DE PERFIL DE ATLETA SELECIONADO (SE HOUVER) */}
+              {selectedAthlete ? (
                 <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+                  <button
+                    onClick={() => setSelectedAthlete(null)}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Voltar à listagem geral
+                  </button>
+
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                     <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil do Atleta</span>
+                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil Individual</span>
                       <h1 className="text-2xl sm:text-3xl font-black text-white">{selectedAthlete.full_name || selectedAthlete.name}</h1>
                     </div>
                     <button
@@ -726,7 +621,7 @@ export default function CoachDashboard() {
                   </div>
 
                   <div className="pt-4 border-t border-slate-800">
-                    <h3 className="text-base font-bold text-white mb-3">Provas Atribuidas a este Atleta</h3>
+                    <h3 className="text-base font-bold text-white mb-3">Provas Atribuídas a este Atleta</h3>
                     {races.filter(r => r.athleteId === selectedAthlete.id).length === 0 ? (
                       <p className="text-xs text-slate-500 italic">Nenhuma prova atribuída a este atleta de momento.</p>
                     ) : (
@@ -738,7 +633,10 @@ export default function CoachDashboard() {
                               <span className="text-xs text-slate-400">{r.distance} km • {r.elevation}m D+</span>
                             </div>
                             <button
-                              onClick={() => handleEditRace(r)}
+                              onClick={() => {
+                                handleEditRace(r);
+                                setSelectedAthlete(null);
+                              }}
                               className="text-xs text-emerald-400 hover:underline"
                             >
                               Ver Plano
@@ -749,18 +647,60 @@ export default function CoachDashboard() {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              ) : null}
 
-            {/* TAB: NOVO ATLETA */}
-            {activeTab === 'new-athlete' && (
-              <div className="space-y-6 max-w-2xl mx-auto">
+              {/* SECÇÃO 1: LISTA DE ATLETAS */}
+              <section id="section-athletes-list" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h1 className="text-2xl font-bold text-white">Registar Novo Atleta</h1>
-                  <button onClick={() => setActiveTab('athletes')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Gestão de Equipa</span>
+                    <h2 className="text-xl font-bold text-white">Lista de Atletas ({athletes.length})</h2>
+                  </div>
+                  <button
+                    onClick={() => scrollToSection('section-new-athlete')}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                  </button>
                 </div>
 
-                <form onSubmit={handleAddAthlete} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+                {athletes.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-xs italic">
+                    Ainda não tem atletas registados. Utilize o formulário abaixo para adicionar o primeiro.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {athletes.map((ath) => (
+                      <div
+                        key={ath.id}
+                        onClick={() => setSelectedAthlete(ath)}
+                        className="bg-slate-950 hover:bg-slate-800/80 border border-slate-800 p-4 rounded-xl space-y-2 cursor-pointer transition-all group shadow"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white group-hover:text-emerald-400 transition-colors">
+                            {ath.full_name || ath.name}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-transform group-hover:translate-x-1" />
+                        </div>
+                        <div className="text-xs text-slate-400 flex items-center gap-3 pt-1 border-t border-slate-900">
+                          {ath.age && <span>{ath.age} anos</span>}
+                          {ath.gender && <span>• {ath.gender}</span>}
+                          {ath.weight && <span className="text-emerald-400 font-medium">• {ath.weight} kg</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* SECÇÃO 2: REGISTAR NOVO ATLETA */}
+              <section id="section-new-athlete" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
+                <div className="border-b border-slate-800 pb-4">
+                  <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Novo Registo</span>
+                  <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
+                </div>
+
+                <form onSubmit={handleAddAthlete} className="space-y-4">
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Nome Completo *</label>
                     <input
@@ -851,20 +791,40 @@ export default function CoachDashboard() {
                     Guardar Atleta
                   </button>
                 </form>
-              </div>
-            )}
+              </section>
 
-            {/* TAB: CRIAR / EDITAR PROVA E GPX */}
-            {activeTab === 'new-race' && (
-              <div className="space-y-6 max-w-3xl mx-auto">
+              {/* SECÇÃO 3: NOVA PROVA & GPX */}
+              <section id="section-new-race" className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h1 className="text-2xl font-bold text-white">
-                    {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Estratégia GPX'}
-                  </h1>
-                  <button onClick={() => setActiveTab('races')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Planeamento</span>
+                    <h2 className="text-xl font-bold text-white">
+                      {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Estratégia GPX'}
+                    </h2>
+                  </div>
+                  {editingRaceId && (
+                    <button
+                      onClick={() => {
+                        setEditingRaceId(null);
+                        setRaceForm({
+                          name: '',
+                          date: new Date().toISOString().split('T')[0],
+                          distance: '',
+                          elevation: '',
+                          athleteId: athletes[0]?.id || '',
+                          targetCarbsPerHour: '60',
+                          maxHeartRate: '185',
+                          restingHeartRate: '50'
+                        });
+                      }}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      Cancelar Edição
+                    </button>
+                  )}
                 </div>
 
-                <form onSubmit={handleSaveRace} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6 shadow-xl">
+                <form onSubmit={handleSaveRace} className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Nome da Prova</label>
@@ -886,7 +846,7 @@ export default function CoachDashboard() {
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                       >
                         {athletes.length === 0 ? (
-                          <option value="">Adicione primeiro um atleta na aba "Novo Atleta"</option>
+                          <option value="">Adicione primeiro um atleta na secção anterior</option>
                         ) : (
                           athletes.map((a) => (
                             <option key={a.id} value={a.id}>
@@ -984,28 +944,20 @@ export default function CoachDashboard() {
                     {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Plano Nutricional & Pacing GPX'}
                   </button>
                 </form>
-              </div>
-            )}
+              </section>
 
-            {/* TAB: LISTA DE PROVAS */}
-            {activeTab === 'races' && (
-              <div className="space-y-6">
+              {/* SECÇÃO 4: PLANOS DE PROVA ATIVOS (LISTA) */}
+              <section id="section-races-list" className="space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <h1 className="text-2xl font-bold text-white">Planos de Prova Ativos</h1>
-                  <button
-                    onClick={() => {
-                      setEditingRaceId(null);
-                      setActiveTab('new-race');
-                    }}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all"
-                  >
-                    <Sparkles className="h-4 w-4" /> Nova Prova
-                  </button>
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Histórico</span>
+                    <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
+                  </div>
                 </div>
 
                 {races.length === 0 ? (
                   <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhuma prova planeada. Clique em "Nova Prova" para gerar a estratégia.
+                    Nenhuma prova planeada. Utilize a secção "Nova Prova & GPX" acima para gerar a estratégia.
                   </div>
                 ) : (
                   races.map((race) => {
@@ -1079,8 +1031,9 @@ export default function CoachDashboard() {
                     );
                   })
                 )}
-              </div>
-            )}
+              </section>
+
+            </div>
           </div>
         )}
       </main>
