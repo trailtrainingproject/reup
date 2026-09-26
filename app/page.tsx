@@ -29,7 +29,10 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Zap,
-  Heart
+  Heart,
+  CloudSun,
+  Calendar,
+  Printer
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FitParser from 'fit-file-parser';
@@ -46,10 +49,18 @@ interface RacePlanSector {
   nutritionTips: string;
 }
 
+interface PreRaceNutrition {
+  dayMinus3: string;
+  dayMinus2: string;
+  dayMinus1: string;
+  raceMorning: string;
+}
+
 interface Race {
   id: string;
   name: string;
   date: string;
+  location: string;
   distance: number;
   elevation: number;
   gpxFileName?: string | null;
@@ -57,6 +68,14 @@ interface Race {
   targetCarbsPerHour: number;
   maxHeartRate: number;
   restingHeartRate: number;
+  weatherEstimate?: {
+    tempMin: string;
+    tempMax: string;
+    condition: string;
+    humidity: string;
+    wind: string;
+  };
+  preRaceNutrition?: PreRaceNutrition;
   athleteMetrics?: {
     weeklyKm: string;
     weeklyHours: string;
@@ -105,28 +124,24 @@ export default function CoachDashboard() {
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário de Prova & Questionário Avançado de Atleta
+  // Formulário de Prova & Questionário Avançado
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
+    location: 'Penacova',
     distance: '',
     elevation: '',
     athleteId: '',
     targetCarbsPerHour: '60',
     maxHeartRate: '185',
     restingHeartRate: '50',
-    // Questionário Detalhado
+    // Métricas Fisiológicas
     weeklyKm: '55',
     weeklyHours: '7.5',
     weeklyDPlus: '2200',
     minHeartRate: '42',
     testedMaxHR: '190',
     avgTrainingHR: '145',
-    hrZone1: '120-135',
-    hrZone2: '136-150',
-    hrZone3: '151-165',
-    hrZone4: '166-180',
-    hrZone5: '181-190',
     effort20Min: '178 bpm / 4:10 min/km',
     effortClimb: '168 bpm / 7:30 min/km',
     effort1h: '158 bpm / 4:45 min/km',
@@ -297,7 +312,7 @@ export default function CoachDashboard() {
     setView('public');
   };
 
-  // Leitura e cálculo real das médias com base em 1, 2 ou 3 ficheiros .fit / .gz carregados
+  // Leitura automática dos ficheiros de treino (.FIT / .GZ)
   const handleActivityFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -423,7 +438,7 @@ export default function CoachDashboard() {
         sector: 'Setor 1: Início & Aquecimento',
         distanceKm: `0.0 km - ${s1Km} km`,
         terrain: 'Subidas graduais / Trilho inicial',
-        targetPace: `Gestão conservadora baseada em plano (${flatPace})`,
+        targetPace: `Gestão conservadora (${flatPace})`,
         heartRateZone: `Z1/Z2 (Abaixo de ${z2Upper} bpm)`,
         carbsTarget: `${Math.round(carbsPerHour * 0.8)}g HC/h`,
         hydration: '500ml Água + Eletrólitos',
@@ -433,23 +448,35 @@ export default function CoachDashboard() {
         sector: 'Setor 2: Troço Técnico & Maior D+',
         distanceKm: `${s1Km} km - ${s2Km} km`,
         terrain: `Subidas íngremes e crestas (~${Math.round(elev * 0.65)}m D+)`,
-        targetPace: 'Ritmo constante / Power hiking (7:30 - 9:00 min/km)',
+        targetPace: 'Ritmo constante / Power hiking',
         heartRateZone: `Z2/Z3 (${z2Upper} - ${z3Upper} bpm)`,
         carbsTarget: `${carbsPerHour}g HC/h`,
         hydration: '600-750ml Água com Sódio',
-        nutritionTips: 'Alternar 1 Gel de glicose/frutose (2:1) com barras fáceis de mastigar a cada 30-40 min.'
+        nutritionTips: 'Alternar 1 Gel (2:1) com barras fáceis de mastigar a cada 30-40 min.'
       },
       {
         sector: 'Setor 3: Descidas & Sprint Final',
         distanceKm: `${s2Km} km - ${dist.toFixed(1)} km`,
         terrain: 'Descidas técnicas e aproximação à meta',
-        targetPace: 'Aceleração controlada baseada em descida',
+        targetPace: 'Aceleração controlada',
         heartRateZone: `Z3/Z4 (${z3Upper} - ${maxHR} bpm)`,
         carbsTarget: `${Math.round(carbsPerHour * 1.1)}g HC/h`,
         hydration: '500ml Água / Isotónico',
-        nutritionTips: 'Priorizar géis rápidos ou hydrogels. Utilizar 50-100mg de Cafeína para foco neuromuscular.'
+        nutritionTips: 'Priorizar géis rápidos ou hydrogels. Utilizar 50-100mg de Cafeína.'
       }
     ];
+  };
+
+  const generatePreRaceNutrition = (athleteWeight: number = 70): PreRaceNutrition => {
+    const baseCarbs = Math.round(athleteWeight * 7); // ~7g por kg no carbo-loading
+    const highCarbs = Math.round(athleteWeight * 10); // ~10g por kg na véspera
+
+    return {
+      dayMinus3: `Dia -3 (Início do Carbo-Loading): Ingerir cerca de ${baseCarbs}g de hidratos de carbono no total (foco em arroz branco, massa, batata cozida e aveia). Manter boa hidratação com 2.5L a 3L de água e eletrólitos.`,
+      dayMinus2: `Dia -2 (Supercompensação): Aumentar para ~${baseCarbs + 50}g de hidratos de carbono. Reduzir a quantidade de fibra e gorduras para evitar desconforto gástrico. Evitar crudívores ou leguminosas pesadas.`,
+      dayMinus1: `Dia -1 (Véspera da Prova): Carga máxima de hidratos (~${highCarbs}g). Jantar leve mas rico em hidratos (ex: arroz branco com peito de frango ou peru grelhado, azeite moderado). Evitar alimentos integrais.`,
+      raceMorning: `Manhã da Prova (3h antes): Refeição rica em hidratos de fácil digestão (ex: 100g de aveia/arroz com mel ou fatias de pão branco com compota/banana) + 500ml de água com eletrólitos.`
+    };
   };
 
   const handleSaveRace = (e: React.FormEvent) => {
@@ -463,6 +490,20 @@ export default function CoachDashboard() {
     const restHR = parseInt(raceForm.restingHeartRate) || 50;
 
     const planSectors = generateRacePlanSectors(dist, elev, carbs, maxHR, restHR, raceForm.flatPace);
+
+    // Atribuir peso do atleta selecionado para o cálculo nutricional
+    const assignedAth = athletes.find(a => a.id === raceForm.athleteId);
+    const athWeight = assignedAth?.weight ? parseFloat(assignedAth.weight) : 70;
+    const preRaceNutrition = generatePreRaceNutrition(athWeight);
+
+    // Simulação meteorológica estimada com base na localidade
+    const weatherEstimate = {
+      tempMin: '14°C',
+      tempMax: '24°C',
+      condition: 'Céu limpo / Sol',
+      humidity: '55%',
+      wind: '12 km/h NW'
+    };
 
     const athleteMetrics = {
       weeklyKm: raceForm.weeklyKm,
@@ -479,12 +520,15 @@ export default function CoachDashboard() {
         ...r,
         name: raceForm.name,
         date: raceForm.date,
+        location: raceForm.location,
         distance: dist,
         elevation: elev,
         athleteId: raceForm.athleteId,
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
+        weatherEstimate,
+        preRaceNutrition,
         athleteMetrics,
         planSectors,
         gpxFileName: gpxFile ? gpxFile.name : r.gpxFileName
@@ -495,6 +539,7 @@ export default function CoachDashboard() {
         id: String(Date.now()),
         name: raceForm.name,
         date: raceForm.date,
+        location: raceForm.location,
         distance: dist,
         elevation: elev,
         athleteId: raceForm.athleteId,
@@ -502,6 +547,8 @@ export default function CoachDashboard() {
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
         gpxFileName: gpxFile ? gpxFile.name : null,
+        weatherEstimate,
+        preRaceNutrition,
         athleteMetrics,
         planSectors
       };
@@ -519,6 +566,7 @@ export default function CoachDashboard() {
       ...raceForm,
       name: race.name,
       date: race.date,
+      location: race.location || 'Penacova',
       distance: String(race.distance),
       elevation: String(race.elevation),
       athleteId: race.athleteId,
@@ -534,8 +582,9 @@ export default function CoachDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">
+      {/* Navegação - Oculta na impressão do PDF */}
+      <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
@@ -613,6 +662,12 @@ export default function CoachDashboard() {
           <div className="flex items-center gap-4">
             {coachProfile ? (
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-all shadow"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Exportar PDF
+                </button>
                 <span className="text-xs text-slate-400 hidden sm:inline">
                   Treinador: <strong className="text-slate-200">{coachProfile.full_name || 'Treinador'}</strong>
                 </span>
@@ -626,7 +681,7 @@ export default function CoachDashboard() {
             ) : (
               <button
                 onClick={() => setView('login')}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-lg shadow-emerald-500/10 transition-all"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-lg transition-all"
               >
                 <LogIn className="h-4 w-4" /> Entrar
               </button>
@@ -635,7 +690,7 @@ export default function CoachDashboard() {
         </div>
       </nav>
 
-      <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+      <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto print:p-0">
         {view === 'public' && (
           <div className="space-y-16 py-12 text-center max-w-3xl mx-auto">
             <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">
@@ -650,7 +705,7 @@ export default function CoachDashboard() {
             <div className="flex justify-center gap-4 pt-4">
               <button
                 onClick={() => setView('login')}
-                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg"
               >
                 Aceder ao Painel de Treinador <LogIn className="h-4 w-4" />
               </button>
@@ -710,7 +765,7 @@ export default function CoachDashboard() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
                   Entrar
@@ -722,7 +777,7 @@ export default function CoachDashboard() {
 
         {view === 'coach' && coachProfile && (
           <div className="space-y-8">
-            <div className="flex md:hidden gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+            <div className="flex md:hidden gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800 print:hidden">
               <button
                 onClick={() => { setActiveTab('athletes-list'); setSelectedAthlete(null); }}
                 className={`flex-1 py-2 text-xs font-semibold rounded-lg ${activeTab === 'athletes-list' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300'}`}
@@ -741,7 +796,7 @@ export default function CoachDashboard() {
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <button
                   onClick={() => setActiveTab('athletes-list')}
-                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2 print:hidden"
                 >
                   <ArrowLeft className="h-4 w-4" /> Voltar à lista de atletas
                 </button>
@@ -753,7 +808,7 @@ export default function CoachDashboard() {
                   </div>
                   <button
                     onClick={() => handleDeleteAthlete(selectedAthlete.id)}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto"
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto print:hidden"
                   >
                     <Trash2 className="h-4 w-4" /> Eliminar Atleta
                   </button>
@@ -787,30 +842,6 @@ export default function CoachDashboard() {
                       <Scale className="h-4 w-4" /> {selectedAthlete.weight ? `${selectedAthlete.weight} kg` : 'Não definido'}
                     </span>
                   </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-800">
-                  <h3 className="text-base font-bold text-white mb-3">Provas Atribuídas a este Atleta</h3>
-                  {races.filter(r => r.athleteId === selectedAthlete.id).length === 0 ? (
-                    <p className="text-xs text-slate-500 italic">Nenhuma prova atribuída a este atleta de momento.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {races.filter(r => r.athleteId === selectedAthlete.id).map(r => (
-                        <div key={r.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
-                          <div>
-                            <span className="font-bold text-white text-sm block">{r.name}</span>
-                            <span className="text-xs text-slate-400">{r.distance} km • {r.elevation}m D+</span>
-                          </div>
-                          <button
-                            onClick={() => { handleEditRace(r); }}
-                            className="text-xs text-emerald-400 hover:underline"
-                          >
-                            Ver Plano
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             ) : null}
@@ -941,7 +972,7 @@ export default function CoachDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Peso Atual (kg)</label>
+                    <label className="block text-xs text-slate-400 mb-1">Peso Atual (kg) - *Essencial para Carbo-loading*</label>
                     <input
                       type="number"
                       step="0.1"
@@ -955,7 +986,7 @@ export default function CoachDashboard() {
                   <button
                     type="submit"
                     disabled={addingAthlete}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/10"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
                   >
                     {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                     Guardar Atleta
@@ -968,9 +999,9 @@ export default function CoachDashboard() {
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl max-w-4xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
-                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Configuração & Inscrição</span>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Configuração & Meteorologia</span>
                     <h2 className="text-xl font-bold text-white">
-                      {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova & Questionário do Atleta'}
+                      {editingRaceId ? 'Editar Prova & Estratégia' : 'Criar Nova Prova, Meteorologia & Estratégia'}
                     </h2>
                   </div>
                   <button onClick={() => setActiveTab('races-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
@@ -979,7 +1010,7 @@ export default function CoachDashboard() {
                 <form onSubmit={handleSaveRace} className="space-y-8">
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
-                      <Trophy className="h-4 w-4" /> 1. Detalhes da Prova & Ficheiro GPX
+                      <Trophy className="h-4 w-4" /> 1. Detalhes da Prova, Localidade & Data
                     </h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -988,7 +1019,7 @@ export default function CoachDashboard() {
                         <input
                           type="text"
                           required
-                          placeholder="ex: Ultra Trail Serra da Estrela - 50k"
+                          placeholder="ex: Penacova Trail Centro"
                           value={raceForm.name}
                           onChange={(e) => setRaceForm({ ...raceForm, name: e.target.value })}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -1003,7 +1034,7 @@ export default function CoachDashboard() {
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                         >
                           {athletes.length === 0 ? (
-                            <option value="">Adicione primeiro um atleta no menu superior</option>
+                            <option value="">Adicione primeiro um atleta</option>
                           ) : (
                             athletes.map((a) => (
                               <option key={a.id} value={a.id}>
@@ -1015,12 +1046,40 @@ export default function CoachDashboard() {
                       </div>
 
                       <div>
+                        <label className="block text-xs text-slate-400 mb-1">Localidade da Prova (para Meteorologia)</label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                          <input
+                            type="text"
+                            required
+                            placeholder="ex: Penacova"
+                            value={raceForm.location}
+                            onChange={(e) => setRaceForm({ ...raceForm, location: e.target.value })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Data da Prova</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                          <input
+                            type="date"
+                            value={raceForm.date}
+                            onChange={(e) => setRaceForm({ ...raceForm, date: e.target.value })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
                         <label className="block text-xs text-slate-400 mb-1">Distância Total (km) *</label>
                         <input
                           type="number"
                           step="0.1"
                           required
-                          placeholder="ex: 45.0"
+                          placeholder="ex: 46.0"
                           value={raceForm.distance}
                           onChange={(e) => setRaceForm({ ...raceForm, distance: e.target.value })}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -1031,7 +1090,7 @@ export default function CoachDashboard() {
                         <label className="block text-xs text-slate-400 mb-1">Desnível Positivo D+ (m)</label>
                         <input
                           type="number"
-                          placeholder="ex: 2500"
+                          placeholder="ex: 1777"
                           value={raceForm.elevation}
                           onChange={(e) => setRaceForm({ ...raceForm, elevation: e.target.value })}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -1040,12 +1099,12 @@ export default function CoachDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Carregar Percurso em Ficheiro GPX</label>
+                      <label className="block text-xs text-slate-400 mb-1">Ficheiro GPX do Percurso</label>
                       <input
                         type="file"
                         accept=".gpx"
                         onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
-                        className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer"
+                        className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -1057,10 +1116,10 @@ export default function CoachDashboard() {
                           <Zap className="h-4 w-4" /> 2. Opcional: Importar Ficheiros de Treino (.FIT ou .GZ)
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Carregue 1 a 3 ficheiros para o sistema ler as métricas reais e calcular as médias automaticamente.
+                          Carregue ficheiros para preencher automaticamente as métricas fisiológicas abaixo.
                         </p>
                       </div>
-                      <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto">
+                      <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
                         <FileSpreadsheet className="h-4 w-4" /> Selecionar .FIT / .GZ
                         <input
                           type="file"
@@ -1074,7 +1133,7 @@ export default function CoachDashboard() {
 
                     {analyzingActivity && (
                       <div className="flex items-center gap-3 text-xs text-emerald-400 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> A analisar e a calcular médias reais dos ficheiros...
+                        <Loader2 className="h-4 w-4 animate-spin" /> A analisar e a calcular médias reais...
                       </div>
                     )}
 
@@ -1091,7 +1150,7 @@ export default function CoachDashboard() {
 
                   <div className="space-y-6 pt-2">
                     <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2 border-t border-slate-800 pt-6">
-                      <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta
+                      <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta (Preenchimento Manual ou Auto)
                     </h3>
 
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -1171,36 +1230,6 @@ export default function CoachDashboard() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-900">
-                        <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">Esforço 20-30 min forte</label>
-                          <input
-                            type="text"
-                            value={raceForm.effort20Min}
-                            onChange={(e) => setRaceForm({ ...raceForm, effort20Min: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">Esforço Subida 10-20 min</label>
-                          <input
-                            type="text"
-                            value={raceForm.effortClimb}
-                            onChange={(e) => setRaceForm({ ...raceForm, effortClimb: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">Esforço Corrida 1h</label>
-                          <input
-                            type="text"
-                            value={raceForm.effort1h}
-                            onChange={(e) => setRaceForm({ ...raceForm, effort1h: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                      </div>
-
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-900">
                         <div>
                           <label className="block text-[11px] text-slate-400 mb-1">Limiar de FC (LTHR - bpm)</label>
@@ -1269,10 +1298,10 @@ export default function CoachDashboard() {
 
                   <button
                     type="submit"
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
                   >
                     <Sparkles className="h-4 w-4" />
-                    {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Estratégia Final de Prova & Nutrição'}
+                    {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Relatório Completo (Meteorologia, Carbo-Loading & Sectores)'}
                   </button>
                 </form>
               </div>
@@ -1280,46 +1309,62 @@ export default function CoachDashboard() {
 
             {activeTab === 'races-list' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4 print:hidden">
                   <div>
-                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Histórico</span>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Relatório & Histórico</span>
                     <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
                   </div>
-                  <button
-                    onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" /> Nova Prova
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <Printer className="h-3.5 w-3.5" /> Imprimir / Exportar PDF
+                    </button>
+                    <button
+                      onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Nova Prova
+                    </button>
+                  </div>
                 </div>
 
                 {races.length === 0 ? (
                   <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhuma prova planeada. Selecione "Provas &gt; Criar Nova Prova &amp; GPX" no menu superior.
+                    Nenhuma prova planeada. Crie uma nova prova no menu superior.
                   </div>
                 ) : (
                   races.map((race) => {
                     const assignedAthlete = athletes.find((a) => a.id === race.athleteId);
 
                     return (
-                      <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black print:border-none print:shadow-none">
+                        
+                        {/* Cabeçalho do Relatório */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:border-slate-300">
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 className="text-xl font-bold text-white">{race.name}</h3>
-                              <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                              <h3 className="text-2xl font-black text-white print:text-slate-900">{race.name}</h3>
+                              <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full print:border-emerald-600 print:text-emerald-700">
                                 Atleta: {assignedAthlete?.full_name || assignedAthlete?.name || 'Geral'}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-3">
-                              <span><MapPin className="inline h-3 w-3 mr-1" />{race.distance} km</span>
-                              <span><Mountain className="inline h-3 w-3 mr-1" />{race.elevation}m D+</span>
+                            <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-4 print:text-slate-600">
+                              <span><MapPin className="inline h-3 w-3 mr-1 text-emerald-400" />{race.location} ({race.date})</span>
+                              <span><Mountain className="inline h-3 w-3 mr-1" />{race.distance} km • {race.elevation}m D+</span>
                               <span><Apple className="inline h-3 w-3 mr-1 text-emerald-400" />{race.targetCarbsPerHour}g HC/h</span>
                               <span><Heart className="inline h-3 w-3 mr-1 text-red-400" />FC Máx {race.maxHeartRate} bpm</span>
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 print:hidden">
+                            <button
+                              onClick={() => window.print()}
+                              className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1 transition-all"
+                            >
+                              <Printer className="h-3.5 w-3.5" /> PDF
+                            </button>
                             <button
                               onClick={() => handleEditRace(race)}
                               className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-all"
@@ -1335,49 +1380,94 @@ export default function CoachDashboard() {
                           </div>
                         </div>
 
+                        {/* Bloco de Meteorologia Estimada */}
+                        {race.weatherEstimate && (
+                          <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 print:border-slate-300 print:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <CloudSun className="h-6 w-6 text-blue-400" />
+                              <div>
+                                <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block">Previsão Meteorológica em {race.location}</span>
+                                <span className="text-xs text-slate-300 print:text-slate-700">Condição: <strong>{race.weatherEstimate.condition}</strong> • Vento: {race.weatherEstimate.wind} • Humidade: {race.weatherEstimate.humidity}</span>
+                              </div>
+                            </div>
+                            <div className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-3 py-1.5 rounded-lg print:bg-white print:border-slate-300">
+                              Temperaturas: <strong>{race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax}</strong>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bloco de Métricas do Atleta */}
                         {race.athleteMetrics && (
-                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs print:bg-slate-50 print:border-slate-300">
                             <div>
-                              <span className="text-slate-500 block">Volume Semanal</span>
-                              <span className="text-white font-medium">{race.athleteMetrics.weeklyKm} km | {race.athleteMetrics.weeklyHours}h</span>
+                              <span className="text-slate-500 print:text-slate-600 block">Volume Semanal</span>
+                              <span className="text-white print:text-black font-medium">{race.athleteMetrics.weeklyKm} km | {race.athleteMetrics.weeklyHours}h</span>
                             </div>
                             <div>
-                              <span className="text-slate-500 block">Limiar (LTHR)</span>
+                              <span className="text-slate-500 print:text-slate-600 block">Limiar (LTHR)</span>
                               <span className="text-red-400 font-medium">{race.athleteMetrics.lthr} bpm</span>
                             </div>
                             <div>
-                              <span className="text-slate-500 block">Ritmo Plano</span>
+                              <span className="text-slate-500 print:text-slate-600 block">Ritmo Plano</span>
                               <span className="text-emerald-400 font-medium">{race.athleteMetrics.flatPace}</span>
                             </div>
                             <div>
-                              <span className="text-slate-500 block">Ritmo Subida</span>
+                              <span className="text-slate-500 print:text-slate-600 block">Ritmo Subida</span>
                               <span className="text-emerald-400 font-medium">{race.athleteMetrics.uphillPace}</span>
                             </div>
                           </div>
                         )}
 
+                        {/* Guia Nutricional de Pré-Prova (Carbo-Loading 3 Dias Antes) */}
+                        {race.preRaceNutrition && (
+                          <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 print:border-slate-300 print:bg-slate-50 space-y-3">
+                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
+                              <Apple className="h-4 w-4" /> Plano Nutricional de Pré-Prova (Carbo-Loading - 3 Dias Antes)
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                <strong className="text-emerald-400 block mb-1">3 Dias Antes (-3)</strong>
+                                <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus3}</span>
+                              </div>
+                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                <strong className="text-emerald-400 block mb-1">2 Dias Antes (-2)</strong>
+                                <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus2}</span>
+                              </div>
+                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                <strong className="text-emerald-400 block mb-1">Véspera (-1)</strong>
+                                <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus1}</span>
+                              </div>
+                              <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
+                                <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.raceMorning}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Setores Estratégicos da Prova */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {race.planSectors.map((sec, idx) => (
-                            <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                            <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 print:bg-slate-50 print:border-slate-300">
                               <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
                                 {sec.sector}
                               </span>
-                              <div className="text-xs text-slate-300 font-medium">{sec.distanceKm}</div>
+                              <div className="text-xs text-slate-300 print:text-slate-800 font-medium">{sec.distanceKm}</div>
 
-                              <div className="space-y-2 pt-2 border-t border-slate-900 text-xs">
+                              <div className="space-y-2 pt-2 border-t border-slate-900 print:border-slate-200 text-xs">
                                 <div>
-                                  <span className="text-slate-500 block">Terreno & Pacing</span>
-                                  <span className="text-slate-200">{sec.terrain}</span>
+                                  <span className="text-slate-500 print:text-slate-600 block">Terreno & Pacing</span>
+                                  <span className="text-slate-200 print:text-slate-900">{sec.terrain}</span>
                                 </div>
                                 <div>
-                                  <span className="text-slate-500 block">Ritmo Cardíaco Recomendado</span>
+                                  <span className="text-slate-500 print:text-slate-600 block">Ritmo Cardíaco Recomendado</span>
                                   <span className="text-red-400 font-medium">{sec.heartRateZone}</span>
                                 </div>
                                 <div>
-                                  <span className="text-slate-500 block">Estratégia Nutricional (HC/h)</span>
+                                  <span className="text-slate-500 print:text-slate-600 block">Estratégia Nutricional (HC/h)</span>
                                   <span className="text-emerald-400 font-medium">{sec.carbsTarget} ({sec.hydration})</span>
                                 </div>
-                                <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 mt-2">
+                                <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 print:bg-white print:border-slate-200 text-[11px] text-slate-400 print:text-slate-700 mt-2">
                                   <Apple className="h-3 w-3 text-emerald-400 inline mr-1" />
                                   {sec.nutritionTips}
                                 </div>
