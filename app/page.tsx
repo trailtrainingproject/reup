@@ -175,6 +175,7 @@ export default function CoachDashboard() {
       const { error } = await supabase.from('profiles').insert([
         {
           id: athleteId,
+          name: newAthlete.name, // Preenche a coluna 'name' obrigatória no Supabase
           full_name: newAthlete.name,
           email: newAthlete.email || null,
           phone: newAthlete.phone || null,
@@ -200,7 +201,7 @@ export default function CoachDashboard() {
       });
       await loadAthletes(coachProfile.id);
     } catch (err: any) {
-      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões da tabela profiles.'));
+      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões.'));
     } finally {
       setAddingAthlete(false);
     }
