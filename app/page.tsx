@@ -2,11 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Mountain,
-  ShieldCheck,
-  Zap,
   Trophy,
   ArrowRight,
   LogIn,
@@ -18,12 +16,11 @@ import {
   Mail,
   Loader2,
   Plus,
-  Flame,
-  Droplets,
   Gauge,
-  Footprints,
   Calendar,
-  Clock
+  Users,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -46,7 +43,25 @@ export default function LandingPage() {
     type: 'Trail Run'
   });
 
-  // Função de Login atualizada com verificação flexível de papéis (Coach/Atleta)
+  // Estados do Dashboard do Treinador
+  const [athletes, setAthletes] = useState<any[]>([
+    { id: '1', name: 'João Silva', email: 'joao@example.com', target: 'UTMB 50K' },
+    { id: '2', name: 'Maria Santos', email: 'maria@example.com', target: 'MIGUT 30K' }
+  ]);
+  const [newAthleteName, setNewAthleteName] = useState('');
+  const [newAthleteEmail, setNewAthleteEmail] = useState('');
+  const [selectedAthleteId, setSelectedAthleteId] = useState<string>('1');
+
+  const [prescribedWorkouts, setPrescribedWorkouts] = useState<any[]>([]);
+  const [prescription, setPrescription] = useState({
+    title: '',
+    distance: '',
+    elevation: '',
+    pace: '',
+    notes: ''
+  });
+
+  // Função de Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -61,14 +76,12 @@ export default function LandingPage() {
       if (authError) throw authError;
 
       if (authData?.user) {
-        // Leitura segura da tabela profiles sem disparar erro se a tabela estiver vazia
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', authData.user.id)
           .maybeSingle();
 
-        // Determina o papel (dá prioridade ao perfil na BD, senão usa o botão selecionado)
         const effectiveRole = profile?.role || loginRole;
 
         setUserProfile({
@@ -96,6 +109,7 @@ export default function LandingPage() {
     setView('public');
   };
 
+  // Funções de Atleta
   const handleAddWorkout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkout.title || !newWorkout.distance) return;
@@ -114,7 +128,42 @@ export default function LandingPage() {
     setNewWorkout({ title: '', distance: '', elevation: '', duration: '', type: 'Trail Run' });
   };
 
-  // Cálculos dinâmicos
+  // Funções de Treinador
+  const handleAddAthlete = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAthleteName) return;
+
+    const athlete = {
+      id: String(Date.now()),
+      name: newAthleteName,
+      email: newAthleteEmail || 'atleta@example.com',
+      target: 'Geral'
+    };
+
+    setAthletes([...athletes, athlete]);
+    setNewAthleteName('');
+    setNewAthleteEmail('');
+  };
+
+  const handlePrescribeWorkout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prescription.title) return;
+
+    const athlete = athletes.find(a => a.id === selectedAthleteId);
+
+    setPrescribedWorkouts([
+      {
+        id: Date.now(),
+        athleteName: athlete?.name || 'Atleta',
+        ...prescription,
+        date: new Date().toLocaleDateString('pt-PT')
+      },
+      ...prescribedWorkouts
+    ]);
+
+    setPrescription({ title: '', distance: '', elevation: '', pace: '', notes: '' });
+  };
+
   const totalDistance = workouts.reduce((acc, curr) => acc + (curr.distance || 0), 0);
   const totalElevation = workouts.reduce((acc, curr) => acc + (curr.elevation || 0), 0);
 
@@ -176,7 +225,6 @@ export default function LandingPage() {
                 <p className="text-xs text-slate-400 mt-1">Introduz o teu email e palavra-passe registrados</p>
               </div>
 
-              {/* Botões para selecionar o perfil no Login */}
               <div className="mb-4 grid grid-cols-2 gap-2 p-1 bg-slate-800/60 rounded-xl">
                 <button
                   type="button"
@@ -287,7 +335,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* MÉTIRCAS GERAIS */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center gap-4">
                 <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
@@ -320,7 +367,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* SECÇÃO REGISTAR TREINO */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Plus className="h-5 w-5 text-emerald-400" /> Registar Novo Treino
@@ -363,13 +409,12 @@ export default function LandingPage() {
               </form>
             </div>
 
-            {/* HISTÓRICO DE TREINOS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-emerald-400" /> Histórico de Treinos
               </h2>
               {workouts.length === 0 ? (
-                <p className="text-xs text-slate-500">Nenhum treino registrado ainda. Adiciona o teu primeiro treino acima!</p>
+                <p className="text-xs text-slate-500">Nenhum treino registrado ainda.</p>
               ) : (
                 <div className="space-y-2">
                   {workouts.map((w) => (
@@ -391,36 +436,184 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* DASHBOARD DO TREINADOR */}
+        {/* DASHBOARD DO TREINADOR COMPLETO */}
         {view === 'coach' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-                <p className="text-xs text-slate-400">Gestão técnica de atletas, planos de carga e métricas de pacing</p>
+                <p className="text-xs text-slate-400">Gestão técnica de atletas, planos de carga e prescrição de treinos</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* SECÇÃO 1: ADICIONAR E LISTAR ATLETAS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-emerald-400" /> Prescrição de Treinos
+                  <Users className="h-5 w-5 text-emerald-400" /> Adicionar Atleta
                 </h2>
-                <p className="text-xs text-slate-400">Atribui sessões de treino, ritmos-alvo e estratégias de nutrição aos teus atletas.</p>
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-500">
-                  Módulo de planeamento avançado ativo para a época 2026.
-                </div>
+                <form onSubmit={handleAddAthlete} className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Nome do Atleta</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Carlos Mota"
+                      value={newAthleteName}
+                      onChange={(e) => setNewAthleteName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Email</label>
+                    <input
+                      type="email"
+                      placeholder="atleta@email.com"
+                      value={newAthleteEmail}
+                      onChange={(e) => setNewAthleteEmail(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl text-xs transition-all"
+                  >
+                    Registar Atleta
+                  </button>
+                </form>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              {/* LISTA DE ATLETAS ASSOCIADOS */}
+              <div className="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Gauge className="h-5 w-5 text-emerald-400" /> Análise de Carga & Atletas
+                  <Gauge className="h-5 w-5 text-emerald-400" /> Os Meus Atletas ({athletes.length})
                 </h2>
-                <p className="text-xs text-slate-400">Acompanhamento contínuo da relação de carga crónica/aguda.</p>
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-500">
-                  Nenhum atleta associado no momento.
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {athletes.map((athlete) => (
+                    <div
+                      key={athlete.id}
+                      onClick={() => setSelectedAthleteId(athlete.id)}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                        selectedAthleteId === athlete.id
+                          ? 'bg-emerald-500/10 border-emerald-500'
+                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-white text-sm">{athlete.name}</h3>
+                          <p className="text-xs text-slate-400">{athlete.email}</p>
+                        </div>
+                        <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold">
+                          {athlete.target}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            </div>
+
+            {/* SECÇÃO 2: PRESCRIÇÃO DE TREINOS */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Brain className="h-5 w-5 text-emerald-400" /> Prescrever Treino
+              </h2>
+              <form onSubmit={handlePrescribeWorkout} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Atleta Selecionado</label>
+                    <select
+                      value={selectedAthleteId}
+                      onChange={(e) => setSelectedAthleteId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {athletes.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Título do Treino</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Séries Subida Z4"
+                      value={prescription.title}
+                      onChange={(e) => setPrescription({ ...prescription, title: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Distância (km)</label>
+                    <input
+                      type="number"
+                      placeholder="15"
+                      value={prescription.distance}
+                      onChange={(e) => setPrescription({ ...prescription, distance: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Desnível D+ (m)</label>
+                    <input
+                      type="number"
+                      placeholder="800"
+                      value={prescription.elevation}
+                      onChange={(e) => setPrescription({ ...prescription, elevation: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Instruções Técnicas & Nutrição</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Manter RPE 6 nas subidas. 40g de hidratos/hora."
+                    value={prescription.notes}
+                    onChange={(e) => setPrescription({ ...prescription, notes: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all"
+                >
+                  <Send className="h-4 w-4" /> Enviar Prescrição ao Atleta
+                </button>
+              </form>
+            </div>
+
+            {/* SECÇÃO 3: HISTÓRICO DE PRESCRIÇÕES */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Treinos Prescritos Recentemente
+              </h2>
+              {prescribedWorkouts.length === 0 ? (
+                <p className="text-xs text-slate-500">Nenhuma prescrição enviada recentemente.</p>
+              ) : (
+                <div className="space-y-2">
+                  {prescribedWorkouts.map((p) => (
+                    <div key={p.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-emerald-400">{p.athleteName}</span>
+                          <span className="text-xs text-slate-600">•</span>
+                          <h3 className="font-bold text-white text-sm">{p.title}</h3>
+                        </div>
+                        {p.notes && <p className="text-xs text-slate-400 mt-1">{p.notes}</p>}
+                      </div>
+                      <div className="flex gap-4 text-xs font-semibold text-slate-300">
+                        {p.distance && <span>{p.distance} km</span>}
+                        {p.elevation && <span>{p.elevation} m D+</span>}
+                        <span className="text-slate-500">{p.date}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
