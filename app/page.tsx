@@ -96,15 +96,11 @@ export default function CoachDashboard() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Utilizador Autenticado (Treinador)
   const [coachProfile, setCoachProfile] = useState<{ id: string; full_name?: string } | null>(null);
-
-  // Atletas Vinculados
   const [athletes, setAthletes] = useState<any[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [addingAthlete, setAddingAthlete] = useState(false);
 
-  // Formulário do Atleta
   const [newAthlete, setNewAthlete] = useState({
     name: '',
     email: '',
@@ -115,11 +111,9 @@ export default function CoachDashboard() {
     weight: ''
   });
 
-  // Provas e Planos Criados
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário de Prova & Questionário Avançado
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
@@ -130,7 +124,6 @@ export default function CoachDashboard() {
     targetCarbsPerHour: '60',
     maxHeartRate: '185',
     restingHeartRate: '50',
-    // Métricas Fisiológicas
     weeklyKm: '55',
     weeklyHours: '7.5',
     weeklyDPlus: '2200',
@@ -180,7 +173,7 @@ export default function CoachDashboard() {
       setView('coach');
       await loadAthletes(userId);
     } catch (err) {
-      console.error('Erro ao carregar perfil do treinador:', err);
+      console.error('Erro ao carregar perfil:', err);
     } finally {
       setLoading(false);
     }
@@ -196,6 +189,7 @@ export default function CoachDashboard() {
 
       if (!error && data) {
         setAthletes(data);
+        // Se houver atletas e o formulário ainda não tiver um atleta atribuído, seleciona o primeiro por defeito
         if (data.length > 0 && !raceForm.athleteId) {
           setRaceForm((prev) => ({ ...prev, athleteId: data[0].id }));
         }
@@ -245,15 +239,7 @@ export default function CoachDashboard() {
 
       if (error) throw error;
 
-      setNewAthlete({
-        name: '',
-        email: '',
-        phone: '',
-        birthDate: '',
-        age: '',
-        gender: 'Masculino',
-        weight: ''
-      });
+      setNewAthlete({ name: '', email: '', phone: '', birthDate: '', age: '', gender: 'Masculino', weight: '' });
       await loadAthletes(coachProfile.id);
       setActiveTab('athletes-list');
     } catch (err: any) {
@@ -274,7 +260,7 @@ export default function CoachDashboard() {
         setActiveTab('athletes-list');
       }
     } catch (err: any) {
-      alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as políticas de DELETE.'));
+      alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as políticas.'));
     }
   };
 
@@ -284,13 +270,8 @@ export default function CoachDashboard() {
     setErrorMessage(null);
 
     try {
-      const { data: authData, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-
       if (authData?.user) {
         await loadCoachProfile(authData.user.id);
       }
@@ -307,7 +288,6 @@ export default function CoachDashboard() {
     setView('public');
   };
 
-  // Leitura automática dos ficheiros de treino (.FIT / .GZ)
   const handleActivityFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -355,7 +335,6 @@ export default function CoachDashboard() {
                 totalKm += session.total_distance || 0;
                 totalHours += (session.total_elapsed_time || session.total_timer_time || 0) / 3600;
                 totalDPlus += session.total_ascent || 0;
-                
                 if (session.max_heart_rate) maxHrValues.push(session.max_heart_rate);
                 if (session.average_heart_rate) avgHrValues.push(session.average_heart_rate);
                 
@@ -363,10 +342,8 @@ export default function CoachDashboard() {
                 if (speedKmh && speedKmh > 0) {
                   speedValues.push(speedKmh);
                 } else if (session.total_distance && session.total_elapsed_time) {
-                  const calcSpeed = (session.total_distance / (session.total_elapsed_time / 3600));
-                  speedValues.push(calcSpeed);
+                  speedValues.push(session.total_distance / (session.total_elapsed_time / 3600));
                 }
-
                 parsedCount++;
               }
             }
@@ -379,11 +356,9 @@ export default function CoachDashboard() {
         const avgDistance = totalKm / parsedCount;
         const avgHours = totalHours / parsedCount;
         const avgDPlus = Math.round(totalDPlus / parsedCount);
-
         const avgMaxHr = maxHrValues.length > 0 ? Math.round(maxHrValues.reduce((a, b) => a + b, 0) / maxHrValues.length) : 185;
         const avgTrainingHeartRate = avgHrValues.length > 0 ? Math.round(avgHrValues.reduce((a, b) => a + b, 0) / avgHrValues.length) : 145;
         const computedLthr = Math.round(avgMaxHr * 0.9);
-
         const meanSpeedKmh = speedValues.length > 0 ? (speedValues.reduce((a, b) => a + b, 0) / speedValues.length) : 11.6;
         
         const paceMinutesTotal = 60 / meanSpeedKmh;
@@ -478,6 +453,12 @@ export default function CoachDashboard() {
     e.preventDefault();
     if (!raceForm.name || !raceForm.distance) return;
 
+    // Validação de segurança: se não houver atleta selecionado, força o primeiro da lista se existir
+    let targetAthleteId = raceForm.athleteId;
+    if (!targetAthleteId && athletes.length > 0) {
+      targetAthleteId = athletes[0].id;
+    }
+
     const dist = parseFloat(raceForm.distance);
     const elev = parseInt(raceForm.elevation) || 0;
     const carbs = parseInt(raceForm.targetCarbsPerHour) || 60;
@@ -486,7 +467,7 @@ export default function CoachDashboard() {
 
     const planSectors = generateRacePlanSectors(dist, elev, carbs, maxHR, restHR, raceForm.flatPace);
 
-    const assignedAth = athletes.find(a => a.id === raceForm.athleteId);
+    const assignedAth = athletes.find(a => a.id === targetAthleteId);
     const athWeight = assignedAth?.weight ? parseFloat(assignedAth.weight) : 70;
     const preRaceNutrition = generatePreRaceNutrition(athWeight);
 
@@ -516,7 +497,7 @@ export default function CoachDashboard() {
         location: raceForm.location,
         distance: dist,
         elevation: elev,
-        athleteId: raceForm.athleteId,
+        athleteId: targetAthleteId, // Garantir atualização correta
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
@@ -535,7 +516,7 @@ export default function CoachDashboard() {
         location: raceForm.location,
         distance: dist,
         elevation: elev,
-        athleteId: raceForm.athleteId,
+        athleteId: targetAthleteId, // Garantir atribuição correta
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
@@ -562,7 +543,7 @@ export default function CoachDashboard() {
       location: race.location || 'Penacova',
       distance: String(race.distance),
       elevation: String(race.elevation),
-      athleteId: race.athleteId,
+      athleteId: race.athleteId || (athletes.length > 0 ? athletes[0].id : ''),
       targetCarbsPerHour: String(race.targetCarbsPerHour),
       maxHeartRate: String(race.maxHeartRate),
       restingHeartRate: String(race.restingHeartRate)
@@ -576,7 +557,6 @@ export default function CoachDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">
-      {/* Navegação Superior Simples (Apenas Logótipo e Sair/Exportar) */}
       <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
@@ -706,7 +686,6 @@ export default function CoachDashboard() {
 
         {view === 'coach' && coachProfile && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* MENU LATERAL */}
             <div className="md:col-span-1 space-y-2 print:hidden">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1.5 sticky top-24 shadow-xl">
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 px-3 font-bold block mb-2">Menu Principal</span>
@@ -757,7 +736,6 @@ export default function CoachDashboard() {
               </div>
             </div>
 
-            {/* CONTEÚDO PRINCIPAL (DIREITA) */}
             <div className="md:col-span-3 space-y-6">
               {activeTab === 'athlete-profile' && selectedAthlete ? (
                 <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
