@@ -102,12 +102,10 @@ export default function CoachDashboard() {
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [addingAthlete, setAddingAthlete] = useState(false);
 
-  // Filtro de Atleta no Histórico Geral de Provas
   const [filterAthleteId, setFilterAthleteId] = useState<string>('all');
-  
-  // IDs de provas expandidas no perfil do atleta ou lista
   const [expandedRaceIds, setExpandedRaceIds] = useState<{ [key: string]: boolean }>({});
 
+  // Formulário de Atleta expandido com métricas e campos adicionais para o Supabase
   const [newAthlete, setNewAthlete] = useState({
     name: '',
     email: '',
@@ -115,7 +113,13 @@ export default function CoachDashboard() {
     birthDate: '',
     age: '',
     gender: 'Masculino',
-    weight: ''
+    weight: '',
+    weeklyKm: '50',
+    weeklyHours: '6.5',
+    weeklyDPlus: '1500',
+    maxHeartRate: '185',
+    restingHeartRate: '50',
+    lthr: '170'
   });
 
   const [races, setRaces] = useState<Race[]>([]);
@@ -137,9 +141,6 @@ export default function CoachDashboard() {
     minHeartRate: '42',
     testedMaxHR: '190',
     avgTrainingHR: '145',
-    effort20Min: '178 bpm / 4:10 min/km',
-    effortClimb: '168 bpm / 7:30 min/km',
-    effort1h: '158 bpm / 4:45 min/km',
     lthr: '172',
     avgPace: '5:10 min/km',
     avgSpeed: '11.6 km/h',
@@ -201,7 +202,7 @@ export default function CoachDashboard() {
         }
       }
     } catch (err) {
-      console.error('Erro ao carregar atletas:', err);
+      console.error('Erro ao carregar atletas do Supabase:', err);
     }
   };
 
@@ -220,6 +221,7 @@ export default function CoachDashboard() {
     setNewAthlete((prev) => ({ ...prev, birthDate: dateString, age: calculatedAge }));
   };
 
+  // ADICIONAR ATLETA DIRETAMENTE NO SUPABASE
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAthlete.name || !coachProfile) return;
@@ -227,46 +229,62 @@ export default function CoachDashboard() {
 
     try {
       const athleteId = crypto.randomUUID();
-      const { error } = await supabase.from('profiles').insert([
-        {
-          id: athleteId,
-          name: newAthlete.name,
-          full_name: newAthlete.name,
-          email: newAthlete.email || null,
-          phone: newAthlete.phone || null,
-          birth_date: newAthlete.birthDate || null,
-          age: newAthlete.age ? parseInt(newAthlete.age) : null,
-          gender: newAthlete.gender,
-          weight: newAthlete.weight ? parseFloat(newAthlete.weight) : null,
-          role: 'athlete',
-          coach_id: coachProfile.id
-        }
-      ]);
+      const athletePayload = {
+        id: athleteId,
+        name: newAthlete.name,
+        full_name: newAthlete.name,
+        email: newAthlete.email || null,
+        phone: newAthlete.phone || null,
+        birth_date: newAthlete.birthDate || null,
+        age: newAthlete.age ? parseInt(newAthlete.age) : null,
+        gender: newAthlete.gender,
+        weight: newAthlete.weight ? parseFloat(newAthlete.weight) : null,
+        role: 'athlete',
+        coach_id: coachProfile.id
+      };
 
+      const { error } = await supabase.from('profiles').insert([athletePayload]);
       if (error) throw error;
 
-      setNewAthlete({ name: '', email: '', phone: '', birthDate: '', age: '', gender: 'Masculino', weight: '' });
+      setNewAthlete({
+        name: '',
+        email: '',
+        phone: '',
+        birthDate: '',
+        age: '',
+        gender: 'Masculino',
+        weight: '',
+        weeklyKm: '50',
+        weeklyHours: '6.5',
+        weeklyDPlus: '1500',
+        maxHeartRate: '185',
+        restingHeartRate: '50',
+        lthr: '170'
+      });
+
       await loadAthletes(coachProfile.id);
       setActiveTab('athletes-list');
     } catch (err: any) {
-      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões.'));
+      alert('Erro ao guardar atleta no Supabase: ' + (err.message || 'Verifique as políticas RLS ou colunas da tabela profiles.'));
     } finally {
       setAddingAthlete(false);
     }
   };
 
+  // ELIMINAR ATLETA DO SUPABASE
   const handleDeleteAthlete = async (athleteId: string) => {
-    if (!confirm('Tem a certeza que deseja remover este atleta?')) return;
+    if (!confirm('Tem a certeza que deseja remover este atleta do Supabase?')) return;
     try {
       const { error } = await supabase.from('profiles').delete().eq('id', athleteId);
       if (error) throw error;
+      
       if (coachProfile) await loadAthletes(coachProfile.id);
       if (selectedAthlete?.id === athleteId) {
         setSelectedAthlete(null);
         setActiveTab('athletes-list');
       }
     } catch (err: any) {
-      alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as políticas.'));
+      alert('Erro ao apagar atleta: ' + (err.message || 'Verifique as permissões.'));
     }
   };
 
@@ -769,7 +787,7 @@ export default function CoachDashboard() {
                         onClick={() => handleDeleteAthlete(selectedAthlete.id)}
                         className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto print:hidden"
                       >
-                        <Trash2 className="h-4 w-4" /> Eliminar Atleta
+                        <Trash2 className="h-4 w-4" /> Eliminar Atleta do Supabase
                       </button>
                     </div>
 
@@ -804,7 +822,6 @@ export default function CoachDashboard() {
                     </div>
                   </div>
 
-                  {/* Planos de Prova Associados a Este Atleta */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <Trophy className="h-5 w-5 text-emerald-400" /> Planos de Prova Deste Atleta ({races.filter(r => r.athleteId === selectedAthlete.id).length})
@@ -851,7 +868,6 @@ export default function CoachDashboard() {
                               </div>
                             </div>
 
-                            {/* Detalhes expandidos do plano no perfil */}
                             {isExpanded && (
                               <div className="space-y-4 pt-4 border-t border-slate-800 animate-fadeIn">
                                 {race.weatherEstimate && (
@@ -901,7 +917,7 @@ export default function CoachDashboard() {
                 <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Gestão de Equipa</span>
+                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Gestão de Equipa (Supabase)</span>
                       <h2 className="text-xl font-bold text-white">Lista de Atletas ({athletes.length})</h2>
                     </div>
                     <button
@@ -914,7 +930,7 @@ export default function CoachDashboard() {
 
                   {athletes.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 text-xs italic">
-                      Ainda não tem atletas registados. Use o menu lateral para adicionar o primeiro atleta.
+                      Ainda não tem atletas registados na base de dados. Use o menu para adicionar.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -946,7 +962,7 @@ export default function CoachDashboard() {
                 <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-2xl mx-auto">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Novo Registo</span>
+                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Novo Registo (Supabase)</span>
                       <h2 className="text-xl font-bold text-white">Registar Novo Atleta</h2>
                     </div>
                     <button onClick={() => setActiveTab('athletes-list')} className="text-xs text-slate-400 hover:text-white">← Voltar</button>
@@ -1040,7 +1056,7 @@ export default function CoachDashboard() {
                       className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
                     >
                       {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                      Guardar Atleta
+                      Gravar Atleta no Supabase
                     </button>
                   </form>
                 </div>
@@ -1360,7 +1376,6 @@ export default function CoachDashboard() {
 
               {activeTab === 'races-list' && (
                 <div className="space-y-6">
-                  {/* Cabeçalho & Filtro de Atleta no Histórico */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:hidden">
                     <div>
                       <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Relatório & Histórico</span>
@@ -1368,7 +1383,6 @@ export default function CoachDashboard() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
-                      {/* Filtro por Atleta */}
                       <select
                         value={filterAthleteId}
                         onChange={(e) => setFilterAthleteId(e.target.value)}
@@ -1407,7 +1421,6 @@ export default function CoachDashboard() {
                       return (
                         <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black print:border-none print:shadow-none">
                           
-                          {/* Cabeçalho do Relatório */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:border-slate-300">
                             <div className="cursor-pointer flex-1" onClick={() => toggleRaceExpand(race.id)}>
                               <div className="flex items-center gap-2">
@@ -1446,10 +1459,8 @@ export default function CoachDashboard() {
                             </div>
                           </div>
 
-                          {/* O plano completo só aparece perfeitamente detalhado ao abrir o plano ou na impressão */}
                           {(isExpanded || window.matchMedia('print').matches) && (
                             <div className="space-y-6 animate-fadeIn">
-                              {/* Bloco de Meteorologia Estimada */}
                               {race.weatherEstimate && (
                                 <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 print:border-slate-300 print:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                   <div className="flex items-center gap-2.5">
@@ -1465,7 +1476,6 @@ export default function CoachDashboard() {
                                 </div>
                               )}
 
-                              {/* Bloco de Métricas do Atleta */}
                               {race.athleteMetrics && (
                                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs print:bg-slate-50 print:border-slate-300">
                                   <div>
@@ -1487,7 +1497,6 @@ export default function CoachDashboard() {
                                 </div>
                               )}
 
-                              {/* Guia Nutricional de Pré-Prova (Carbo-Loading 3 Dias Antes) */}
                               {race.preRaceNutrition && (
                                 <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 print:border-slate-300 print:bg-slate-50 space-y-3">
                                   <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
@@ -1514,7 +1523,6 @@ export default function CoachDashboard() {
                                 </div>
                               )}
 
-                              {/* Setores Estratégicos da Prova */}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {race.planSectors.map((sec, idx) => (
                                   <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 print:bg-slate-50 print:border-slate-300">
