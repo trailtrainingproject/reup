@@ -13,7 +13,6 @@ import {
   Lock,
   Mail,
   Loader2,
-  Plus,
   Users,
   Flag,
   Sparkles,
@@ -22,7 +21,11 @@ import {
   Trash2,
   Edit2,
   MapPin,
-  UserPlus
+  UserPlus,
+  Phone,
+  Calendar,
+  Scale,
+  User
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -63,9 +66,18 @@ export default function CoachDashboard() {
 
   // Atletas Vinculados
   const [athletes, setAthletes] = useState<any[]>([]);
-  const [newAthleteName, setNewAthleteName] = useState('');
-  const [newAthleteEmail, setNewAthleteEmail] = useState('');
   const [addingAthlete, setAddingAthlete] = useState(false);
+
+  // Formulário do Atleta
+  const [newAthlete, setNewAthlete] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    birthDate: '',
+    age: '',
+    gender: 'Masculino',
+    weight: ''
+  });
 
   // Provas e Planos Criados
   const [races, setRaces] = useState<Race[]>([]);
@@ -137,9 +149,25 @@ export default function CoachDashboard() {
     }
   };
 
+  // Calcula idade automaticamente ao escolher data de nascimento
+  const handleBirthDateChange = (dateString: string) => {
+    let calculatedAge = '';
+    if (dateString) {
+      const birth = new Date(dateString);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      calculatedAge = age > 0 ? String(age) : '';
+    }
+    setNewAthlete((prev) => ({ ...prev, birthDate: dateString, age: calculatedAge }));
+  };
+
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAthleteName || !coachProfile) return;
+    if (!newAthlete.name || !coachProfile) return;
     setAddingAthlete(true);
 
     try {
@@ -147,8 +175,13 @@ export default function CoachDashboard() {
       const { error } = await supabase.from('profiles').insert([
         {
           id: athleteId,
-          full_name: newAthleteName,
-          email: newAthleteEmail || null,
+          full_name: newAthlete.name,
+          email: newAthlete.email || null,
+          phone: newAthlete.phone || null,
+          birth_date: newAthlete.birthDate || null,
+          age: newAthlete.age ? parseInt(newAthlete.age) : null,
+          gender: newAthlete.gender,
+          weight: newAthlete.weight ? parseFloat(newAthlete.weight) : null,
           role: 'athlete',
           coach_id: coachProfile.id
         }
@@ -156,11 +189,18 @@ export default function CoachDashboard() {
 
       if (error) throw error;
 
-      setNewAthleteName('');
-      setNewAthleteEmail('');
+      setNewAthlete({
+        name: '',
+        email: '',
+        phone: '',
+        birthDate: '',
+        age: '',
+        gender: 'Masculino',
+        weight: ''
+      });
       await loadAthletes(coachProfile.id);
     } catch (err: any) {
-      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique se as permissões da tabela profiles permitem inserção.'));
+      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique as permissões da tabela profiles.'));
     } finally {
       setAddingAthlete(false);
     }
@@ -377,7 +417,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Adiciona os teus atletas, insere ficheiros GPX, define a carga nutricional (HC/h) e calcula o ritmo cardíaco ideal para cada prova.
+              Adiciona os teus atletas com perfil completo, insere ficheiros GPX e gera a melhor estratégia para cada competição.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -465,56 +505,141 @@ export default function CoachDashboard() {
               </div>
             </div>
 
-            {/* SECÇÃO 1: ADICIONAR E GERIR ATLETAS */}
+            {/* SECÇÃO 1: REGISTAR E GERIR ATLETAS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Users className="h-5 w-5 text-emerald-400" />
-                Os Meus Atletas ({athletes.length})
+                Registar Novo Atleta ({athletes.length})
               </h2>
 
-              {/* FORMULÁRIO RÁPIDO PARA ADICIONAR ATLETA */}
-              <form onSubmit={handleAddAthlete} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                <input
-                  type="text"
-                  required
-                  placeholder="Nome do Atleta"
-                  value={newAthleteName}
-                  onChange={(e) => setNewAthleteName(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-                <input
-                  type="email"
-                  placeholder="Email do Atleta (Opcional)"
-                  value={newAthleteEmail}
-                  onChange={(e) => setNewAthleteEmail(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-                <button
-                  type="submit"
-                  disabled={addingAthlete}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
-                >
-                  {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                  Adicionar Atleta
-                </button>
+              <form onSubmit={handleAddAthlete} className="space-y-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Nome */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Nome Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: João Silva"
+                      value={newAthlete.name}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Email</label>
+                    <input
+                      type="email"
+                      placeholder="atleta@email.com"
+                      value={newAthlete.email}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, email: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Telefone */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Contacto Telefónico</label>
+                    <input
+                      type="tel"
+                      placeholder="912 345 678"
+                      value={newAthlete.phone}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, phone: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Data de Nascimento */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Data de Nascimento</label>
+                    <input
+                      type="date"
+                      value={newAthlete.birthDate}
+                      onChange={(e) => handleBirthDateChange(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Idade (Calculada ou Manual) */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Idade</label>
+                    <input
+                      type="number"
+                      placeholder="ex: 32"
+                      value={newAthlete.age}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, age: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Sexo */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Sexo</label>
+                    <select
+                      value={newAthlete.gender}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, gender: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Masculino">Masculino</option>
+                      <option value="Feminino">Feminino</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </div>
+
+                  {/* Peso à Data */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Peso Atual (kg)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="ex: 68.5"
+                      value={newAthlete.weight}
+                      onChange={(e) => setNewAthlete({ ...newAthlete, weight: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Botão Submeter */}
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      disabled={addingAthlete}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
+                    >
+                      {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                      Adicionar Atleta
+                    </button>
+                  </div>
+                </div>
               </form>
 
               {/* LISTA DE ATLETAS REGISTADOS */}
               {athletes.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4 border-t border-slate-800">
                   {athletes.map((ath) => (
-                    <div key={ath.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-semibold text-white block">{ath.full_name}</span>
-                        {ath.email && <span className="text-xs text-slate-500">{ath.email}</span>}
+                    <div key={ath.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-white">{ath.full_name}</span>
+                        <button
+                          onClick={() => handleDeleteAthlete(ath.id)}
+                          className="p-1 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-lg transition-all"
+                          title="Remover Atleta"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleDeleteAthlete(ath.id)}
-                        className="p-1.5 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-lg transition-all"
-                        title="Remover Atleta"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+
+                      <div className="text-xs text-slate-400 space-y-1">
+                        {ath.email && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3 text-slate-500" /> {ath.email}</div>}
+                        {ath.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3 text-slate-500" /> {ath.phone}</div>}
+                        <div className="flex items-center gap-3 pt-1 text-slate-300">
+                          {ath.age && <span>{ath.age} anos</span>}
+                          {ath.gender && <span>• {ath.gender}</span>}
+                          {ath.weight && <span className="text-emerald-400 font-medium">• {ath.weight} kg</span>}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -576,7 +701,7 @@ export default function CoachDashboard() {
                       ) : (
                         athletes.map((a) => (
                           <option key={a.id} value={a.id}>
-                            {a.full_name}
+                            {a.full_name} {a.weight ? `(${a.weight}kg)` : ''}
                           </option>
                         ))
                       )}
@@ -680,7 +805,7 @@ export default function CoachDashboard() {
 
               {races.length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl text-center text-slate-500 text-xs">
-                  Nenhuma prova planeada. Adiciona um atleta acima e preenche o formulário para gerar a estratégia.
+                  Nenhuma prova planeada. Registar um atleta acima e preencher o formulário para gerar a estratégia.
                 </div>
               ) : (
                 races.map((race) => {
@@ -693,7 +818,7 @@ export default function CoachDashboard() {
                           <div className="flex items-center gap-2">
                             <h3 className="text-xl font-bold text-white">{race.name}</h3>
                             <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                              Atleta: {assignedAthlete?.full_name || 'Geral'}
+                              Atleta: {assignedAthlete?.full_name || 'Geral'} {assignedAthlete?.weight ? `(${assignedAthlete.weight}kg)` : ''}
                             </span>
                           </div>
                           <p className="text-xs text-slate-400 mt-1 flex items-center gap-3">
