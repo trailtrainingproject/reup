@@ -15,7 +15,6 @@ import {
   Loader2,
   Users,
   Sparkles,
-  Heart,
   Apple,
   Trash2,
   Edit2,
@@ -29,7 +28,8 @@ import {
   ChevronRight,
   FileSpreadsheet,
   CheckCircle2,
-  Zap
+  Zap,
+  Heart
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FitParser from 'fit-file-parser';
@@ -311,6 +311,7 @@ export default function CoachDashboard() {
       let totalDPlus = 0;
       let maxHrValues: number[] = [];
       let avgHrValues: number[] = [];
+      let speedValues: number[] = [];
       let parsedCount = 0;
 
       for (const file of files) {
@@ -342,10 +343,20 @@ export default function CoachDashboard() {
               if (sessions.length > 0) {
                 const session = sessions[0];
                 totalKm += session.total_distance || 0;
-                totalHours += (session.total_elapsed_time || 0) / 3600;
+                totalHours += (session.total_elapsed_time || session.total_timer_time || 0) / 3600;
                 totalDPlus += session.total_ascent || 0;
+                
                 if (session.max_heart_rate) maxHrValues.push(session.max_heart_rate);
                 if (session.average_heart_rate) avgHrValues.push(session.average_heart_rate);
+                
+                const speedKmh = session.enhanced_avg_speed || session.avg_speed;
+                if (speedKmh && speedKmh > 0) {
+                  speedValues.push(speedKmh);
+                } else if (session.total_distance && session.total_elapsed_time) {
+                  const calcSpeed = (session.total_distance / (session.total_elapsed_time / 3600));
+                  speedValues.push(calcSpeed);
+                }
+
                 parsedCount++;
               }
             }
@@ -355,21 +366,34 @@ export default function CoachDashboard() {
       }
 
       if (parsedCount > 0) {
-        const avgMaxHr = Math.round(maxHrValues.reduce((a, b) => a + b, 0) / maxHrValues.length) || 185;
-        const avgTrainingHeartRate = Math.round(avgHrValues.reduce((a, b) => a + b, 0) / avgHrValues.length) || 145;
+        const avgDistance = totalKm / parsedCount;
+        const avgHours = totalHours / parsedCount;
+        const avgDPlus = Math.round(totalDPlus / parsedCount);
+
+        const avgMaxHr = maxHrValues.length > 0 ? Math.round(maxHrValues.reduce((a, b) => a + b, 0) / maxHrValues.length) : 185;
+        const avgTrainingHeartRate = avgHrValues.length > 0 ? Math.round(avgHrValues.reduce((a, b) => a + b, 0) / avgHrValues.length) : 145;
         const computedLthr = Math.round(avgMaxHr * 0.9);
+
+        const meanSpeedKmh = speedValues.length > 0 ? (speedValues.reduce((a, b) => a + b, 0) / speedValues.length) : 11.6;
+        
+        const paceMinutesTotal = 60 / meanSpeedKmh;
+        const paceMin = Math.floor(paceMinutesTotal);
+        const paceSec = Math.round((paceMinutesTotal - paceMin) * 60);
+        const formattedPace = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} min/km`;
 
         setRaceForm(prev => ({
           ...prev,
-          weeklyKm: (totalKm * (4.5 / parsedCount)).toFixed(1),
-          weeklyHours: (totalHours * (4.5 / parsedCount)).toFixed(1),
-          weeklyDPlus: String(Math.round(totalDPlus * (4.5 / parsedCount))),
+          weeklyKm: (avgDistance * 4).toFixed(1),
+          weeklyHours: (avgHours * 4).toFixed(1),
+          weeklyDPlus: String(avgDPlus * 4),
           maxHeartRate: String(avgMaxHr),
           testedMaxHR: String(avgMaxHr + 2),
           avgTrainingHR: String(avgTrainingHeartRate),
           lthr: String(computedLthr),
-          flatPace: '4:30 min/km',
-          uphillPace: '7:45 min/km'
+          avgPace: formattedPace,
+          avgSpeed: `${meanSpeedKmh.toFixed(1)} km/h`,
+          flatPace: formattedPace,
+          uphillPace: `${Math.floor(paceMin + 2)}:${paceSec < 10 ? '0' : ''}${paceSec} min/km`
         }));
       }
     } catch (err) {
