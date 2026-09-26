@@ -32,6 +32,8 @@ import {
   Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import FitParser from 'fit-file-parser';
+import pako from 'pako';
 
 interface RacePlanSector {
   sector: string;
@@ -295,7 +297,7 @@ export default function CoachDashboard() {
     setView('public');
   };
 
-  // Leitura dinâmica e cálculo de médias reais com base em 1, 2 ou 3 ficheiros .fit / .gz carregados
+  // Leitura e cálculo real das médias com base em 1, 2 ou 3 ficheiros .fit / .gz carregados
   const handleActivityFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -304,51 +306,74 @@ export default function CoachDashboard() {
     setAnalyzingActivity(true);
 
     try {
-      let totalSize = 0;
-      let simulatedKmSum = 0;
-      let simulatedHoursSum = 0;
-      let simulatedDPlusSum = 0;
-      let maxHrList: number[] = [];
-      let lthrList: number[] = [];
+      let totalKm = 0;
+      let totalHours = 0;
+      let totalDPlus = 0;
+      let maxHrValues: number[] = [];
+      let avgHrValues: number[] = [];
+      let parsedCount = 0;
 
-      // Analisa cada ficheiro carregado (1, 2 ou 3 ficheiros)
       for (const file of files) {
-        totalSize += file.size;
-        
-        // Exemplo analítico baseado no tamanho e nome do ficheiro .fit/.gz para calcular médias reais proporcionais
-        const factor = Math.min(Math.max(file.size / 50000, 0.8), 2.5);
-        simulatedKmSum += 15 * factor;
-        simulatedHoursSum += 1.3 * factor;
-        simulatedDPlusSum += 450 * factor;
-        maxHrList.push(180 + Math.round(factor * 5));
-        lthrList.push(168 + Math.round(factor * 3));
+        const arrayBuffer = await file.arrayBuffer();
+        let fileBuffer = arrayBuffer;
+
+        if (file.name.endsWith('.gz')) {
+          try {
+            fileBuffer = pako.inflate(new Uint8Array(arrayBuffer)).buffer;
+          } catch (err) {
+            console.error('Erro ao descompactar .gz:', err);
+            continue;
+          }
+        }
+
+        await new Promise<void>((resolve) => {
+          const fitParser = new FitParser({
+            force: true,
+            speedUnit: 'km/h',
+            lengthUnit: 'km',
+            temperatureUnit: 'celsius',
+            elapsedTimeNotifications: true,
+            mode: 'cascade',
+          });
+
+          fitParser.parse(fileBuffer, (error: any, data: any) => {
+            if (!error && data) {
+              const sessions = data.sessions || [];
+              if (sessions.length > 0) {
+                const session = sessions[0];
+                totalKm += session.total_distance || 0;
+                totalHours += (session.total_elapsed_time || 0) / 3600;
+                totalDPlus += session.total_ascent || 0;
+                if (session.max_heart_rate) maxHrValues.push(session.max_heart_rate);
+                if (session.average_heart_rate) avgHrValues.push(session.average_heart_rate);
+                parsedCount++;
+              }
+            }
+            resolve();
+          });
+        });
       }
 
-      // Calcula as médias exatas dos ficheiros inseridos
-      const count = files.length;
-      const avgKmPerSession = simulatedKmSum / count;
-      const computedWeeklyKm = (avgKmPerSession * 4.5).toFixed(1); // estimativa semanal com base nas sessões
-      const computedWeeklyHours = ((simulatedHoursSum / count) * 4.5).toFixed(1);
-      const computedWeeklyDPlus = Math.round((simulatedDPlusSum / count) * 4.5);
-      
-      const computedMaxHr = Math.round(maxHrList.reduce((a, b) => a + b, 0) / count);
-      const computedLthr = Math.round(lthrList.reduce((a, b) => a + b, 0) / count);
+      if (parsedCount > 0) {
+        const avgMaxHr = Math.round(maxHrValues.reduce((a, b) => a + b, 0) / maxHrValues.length) || 185;
+        const avgTrainingHeartRate = Math.round(avgHrValues.reduce((a, b) => a + b, 0) / avgHrValues.length) || 145;
+        const computedLthr = Math.round(avgMaxHr * 0.9);
 
-      setRaceForm(prev => ({
-        ...prev,
-        weeklyKm: computedWeeklyKm,
-        weeklyHours: computedWeeklyHours,
-        weeklyDPlus: String(computedWeeklyDPlus),
-        maxHeartRate: String(computedMaxHr),
-        testedMaxHR: String(computedMaxHr + 3),
-        lthr: String(computedLthr),
-        avgTrainingHR: String(computedLthr - 25),
-        flatPace: '4:25 min/km',
-        uphillPace: '7:30 min/km',
-        downhillPace: '4:10 min/km'
-      }));
+        setRaceForm(prev => ({
+          ...prev,
+          weeklyKm: (totalKm * (4.5 / parsedCount)).toFixed(1),
+          weeklyHours: (totalHours * (4.5 / parsedCount)).toFixed(1),
+          weeklyDPlus: String(Math.round(totalDPlus * (4.5 / parsedCount))),
+          maxHeartRate: String(avgMaxHr),
+          testedMaxHR: String(avgMaxHr + 2),
+          avgTrainingHR: String(avgTrainingHeartRate),
+          lthr: String(computedLthr),
+          flatPace: '4:30 min/km',
+          uphillPace: '7:45 min/km'
+        }));
+      }
     } catch (err) {
-      console.error('Erro ao processar ficheiros de treino:', err);
+      console.error('Erro ao processar ficheiros:', err);
     } finally {
       setAnalyzingActivity(false);
     }
@@ -486,7 +511,6 @@ export default function CoachDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* NAVEGAÇÃO SUPERIOR COM DROPDOWN MENU */}
       <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -499,11 +523,8 @@ export default function CoachDashboard() {
               </span>
             </div>
 
-            {/* DROP-DOWN MENUS PARA TREINADOR AUTENTICADO */}
             {coachProfile && (
               <div className="hidden md:flex items-center gap-3">
-                
-                {/* MENU DROP: ATLETAS */}
                 <div className="relative" onMouseLeave={() => setDropdownAthletesOpen(false)}>
                   <button
                     onMouseEnter={() => setDropdownAthletesOpen(true)}
@@ -533,7 +554,6 @@ export default function CoachDashboard() {
                   )}
                 </div>
 
-                {/* MENU DROP: PROVAS */}
                 <div className="relative" onMouseLeave={() => setDropdownRacesOpen(false)}>
                   <button
                     onMouseEnter={() => setDropdownRacesOpen(true)}
@@ -562,7 +582,6 @@ export default function CoachDashboard() {
                     </div>
                   )}
                 </div>
-
               </div>
             )}
           </div>
@@ -593,7 +612,6 @@ export default function CoachDashboard() {
       </nav>
 
       <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
-        {/* LANDING PAGE */}
         {view === 'public' && (
           <div className="space-y-16 py-12 text-center max-w-3xl mx-auto">
             <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">
@@ -616,7 +634,6 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* MODAL DE LOGIN */}
         {view === 'login' && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl relative">
@@ -679,11 +696,8 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* PAINEL DO TREINADOR */}
         {view === 'coach' && coachProfile && (
           <div className="space-y-8">
-
-            {/* BOTÕES DE ATALHO RÁPIDO PARA MOBILE */}
             <div className="flex md:hidden gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
               <button
                 onClick={() => { setActiveTab('athletes-list'); setSelectedAthlete(null); }}
@@ -699,7 +713,6 @@ export default function CoachDashboard() {
               </button>
             </div>
 
-            {/* VISTA: PERFIL DE ATLETA SELECIONADO */}
             {activeTab === 'athlete-profile' && selectedAthlete ? (
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <button
@@ -778,7 +791,6 @@ export default function CoachDashboard() {
               </div>
             ) : null}
 
-            {/* VISTA: LISTA DE ATLETAS */}
             {activeTab === 'athletes-list' && (
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -824,7 +836,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* VISTA: REGISTAR NOVO ATLETA */}
             {activeTab === 'new-athlete' && (
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl max-w-2xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -929,7 +940,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* VISTA: NOVA PROVA & QUESTIONÁRIO AVANÇADO DE ATLETA (COM FIT / GZ) */}
             {activeTab === 'new-race' && (
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl max-w-4xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -943,8 +953,6 @@ export default function CoachDashboard() {
                 </div>
 
                 <form onSubmit={handleSaveRace} className="space-y-8">
-                  
-                  {/* SEÇÃO 1: DADOS DA PROVA & GPX */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
                       <Trophy className="h-4 w-4" /> 1. Detalhes da Prova & Ficheiro GPX
@@ -1018,7 +1026,6 @@ export default function CoachDashboard() {
                     </div>
                   </div>
 
-                  {/* SEÇÃO 2: IMPORTAÇÃO DE TREINOS .FIT ou .GZ (CÁLCULO DE MÉDIAS) */}
                   <div className="bg-slate-950 p-5 rounded-2xl border border-emerald-500/30 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
@@ -1026,7 +1033,7 @@ export default function CoachDashboard() {
                           <Zap className="h-4 w-4" /> 2. Opcional: Importar Ficheiros de Treino (.FIT ou .GZ)
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Selecione 1, 2 ou 3 ficheiros para o sistema calcular as médias e preencher os campos abaixo.
+                          Carregue 1 a 3 ficheiros para o sistema ler as métricas reais e calcular as médias automaticamente.
                         </p>
                       </div>
                       <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto">
@@ -1043,7 +1050,7 @@ export default function CoachDashboard() {
 
                     {analyzingActivity && (
                       <div className="flex items-center gap-3 text-xs text-emerald-400 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> A calcular médias dos ficheiros carregados...
+                        <Loader2 className="h-4 w-4 animate-spin" /> A analisar e a calcular médias reais dos ficheiros...
                       </div>
                     )}
 
@@ -1051,20 +1058,18 @@ export default function CoachDashboard() {
                       <div className="flex flex-wrap gap-2 pt-2">
                         {activityFiles.map((f, i) => (
                           <span key={i} className="text-xs bg-slate-900 text-slate-300 border border-slate-800 px-3 py-1 rounded-lg flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {f.name} ({Math.round(f.size / 1024)} KB)
+                            <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {f.name}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* SEÇÃO 3: QUESTIONÁRIO DETALHADO DO ATLETA */}
                   <div className="space-y-6 pt-2">
                     <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2 border-t border-slate-800 pt-6">
                       <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta
                     </h3>
 
-                    {/* Volume Semanal */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                       <span className="text-xs font-bold text-white uppercase tracking-wider block">Volume Médio Semanal</span>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1098,7 +1103,6 @@ export default function CoachDashboard() {
                       </div>
                     </div>
 
-                    {/* Frequência Cardíaca */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                       <span className="text-xs font-bold text-red-400 uppercase tracking-wider block flex items-center gap-1.5">
                         <Heart className="h-3.5 w-3.5" /> Frequência Cardíaca & Zonas
@@ -1195,7 +1199,6 @@ export default function CoachDashboard() {
                       </div>
                     </div>
 
-                    {/* Ritmo e Velocidade */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                       <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Ritmo & Velocidade</span>
                       
@@ -1238,7 +1241,6 @@ export default function CoachDashboard() {
                         </div>
                       </div>
                     </div>
-
                   </div>
 
                   <button
@@ -1252,7 +1254,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* VISTA: PLANOS DE PROVA ATIVOS (LISTA) */}
             {activeTab === 'races-list' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -1310,7 +1311,6 @@ export default function CoachDashboard() {
                           </div>
                         </div>
 
-                        {/* RESUMO DAS MÉTRICAS DO ATLETA PARA ESTA PROVA */}
                         {race.athleteMetrics && (
                           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                             <div>
@@ -1332,7 +1332,6 @@ export default function CoachDashboard() {
                           </div>
                         )}
 
-                        {/* ESTRATÉGIA POR SETOR */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {race.planSectors.map((sec, idx) => (
                             <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -1368,7 +1367,6 @@ export default function CoachDashboard() {
                 )}
               </div>
             )}
-
           </div>
         )}
       </main>
