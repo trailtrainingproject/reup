@@ -13,21 +13,63 @@ import {
   X,
   UserCheck,
   Lock,
-  Mail
+  Mail,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function LandingPage() {
   const [view, setView] = useState<'public' | 'login' | 'coach' | 'athlete'>('public');
-  const [selectedRole, setSelectedRole] = useState<'atleta' | 'treinador'>('atleta');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ full_name?: string; role?: string } | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulação do redirecionamento baseado no perfil (Role)
-    if (selectedRole === 'treinador') {
-      setView('coach');
-    } else {
-      setView('athlete');
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // 1. Autenticar no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // 2. Buscar a 'role' do utilizador na tabela public.profiles
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        setUserProfile(profile);
+
+        // 3. Encaminhar conforme a role atribuída na base de dados
+        if (profile?.role === 'treinador') {
+          setView('coach');
+        } else {
+          setView('athlete');
+        }
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro ao efetuar login. Verifica as credenciais.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUserProfile(null);
+    setView('public');
   };
 
   if (view === 'coach') {
@@ -39,15 +81,19 @@ export default function LandingPage() {
               <Brain /> Central do Treinador
             </h1>
             <button 
-              onClick={() => setView('public')}
+              onClick={handleLogout}
               className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 transition"
             >
               ← Encerrar Sessão
             </button>
           </div>
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <h2 className="text-xl font-bold mb-2">Painel de Gestão de Atletas</h2>
-            <p className="text-slate-400 text-sm">Aqui geres o pacing, os planos de nutrição e as métricas fisiológicas dos teus atletas.</p>
+            <h2 className="text-xl font-bold mb-2">
+              Bem-vindo, {userProfile?.full_name || 'Treinador'}
+            </h2>
+            <p className="text-slate-400 text-sm">
+              Aqui geres o pacing, os planos de nutrição e as métricas fisiológicas dos teus atletas.
+            </p>
           </div>
         </div>
       </div>
@@ -63,15 +109,19 @@ export default function LandingPage() {
               <Activity /> Área Reservada do Atleta
             </h1>
             <button 
-              onClick={() => setView('public')}
+              onClick={handleLogout}
               className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 transition"
             >
               ← Encerrar Sessão
             </button>
           </div>
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <h2 className="text-xl font-bold mb-2">O Teu Treino do Dia</h2>
-            <p className="text-slate-400 text-sm">Acede às tuas zonas de ritmo, hidratação por hora e estratégia de prova.</p>
+            <h2 className="text-xl font-bold mb-2">
+              O Teu Treino do Dia, {userProfile?.full_name || 'Atleta'}
+            </h2>
+            <p className="text-slate-400 text-sm">
+              Acede às tuas zonas de ritmo, hidratação por hora e estratégia de prova.
+            </p>
           </div>
         </div>
       </div>
@@ -158,7 +208,10 @@ export default function LandingPage() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full relative space-y-6">
             <button 
-              onClick={() => setView('public')}
+              onClick={() => {
+                setView('public');
+                setErrorMessage(null);
+              }}
               className="absolute top-6 right-6 text-slate-400 hover:text-white transition"
             >
               <X className="w-5 h-5" />
@@ -166,34 +219,14 @@ export default function LandingPage() {
 
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold text-white">Aceder à Plataforma</h2>
-              <p className="text-slate-400 text-xs">Introduz as tuas credenciais para aceder ao teu painel</p>
+              <p className="text-slate-400 text-xs">Introduz o teu email e palavra-passe registrados</p>
             </div>
 
-            {/* SELETOR DE PERFIL PARA SIMULAÇÃO */}
-            <div className="bg-slate-950 p-1.5 rounded-2xl flex gap-1 border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setSelectedRole('atleta')}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                  selectedRole === 'atleta'
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Sou Atleta
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRole('treinador')}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                  selectedRole === 'treinador'
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Sou Treinador
-              </button>
-            </div>
+            {errorMessage && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl">
+                {errorMessage}
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
@@ -203,6 +236,8 @@ export default function LandingPage() {
                   <input 
                     type="email" 
                     required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="teu.email@exemplo.com"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
                   />
@@ -216,6 +251,8 @@ export default function LandingPage() {
                   <input 
                     type="password" 
                     required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
                   />
@@ -224,9 +261,16 @@ export default function LandingPage() {
 
               <button 
                 type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition pt-3"
+                disabled={loading}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition"
               >
-                <UserCheck className="w-4 h-4" /> Entrar como {selectedRole === 'treinador' ? 'Treinador' : 'Atleta'}
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" /> Entrar na Conta
+                  </>
+                )}
               </button>
             </form>
           </div>
