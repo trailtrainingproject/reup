@@ -418,7 +418,6 @@ export default function CoachDashboard() {
   };
 
   const generateAidStations = (dist: number, elev: number, inputString: string): AidStation[] => {
-    // Se o utilizador inseriu postos por texto, tentamos estruturá-los
     if (inputString && inputString.includes('KM')) {
       const parts = inputString.split('|');
       return parts.map((p, idx) => {
@@ -430,12 +429,11 @@ export default function CoachDashboard() {
           km: kmVal,
           type: idx === parts.length - 1 ? 'Base de Vida' : 'Completo (Sólidos + Líquidos)',
           targetCarbs: '60g - 75g HC / hora',
-          hydration: '500ml Água + Sódio por posto'
+          hydrationNotes: '500ml Água + Sódio por posto'
         };
       });
     }
 
-    // Caso contrário, geramos postos inteligentes baseados na distância
     const stations: AidStation[] = [];
     const count = dist > 40 ? 3 : 2;
     for (let i = 1; i <= count; i++) {
@@ -446,20 +444,18 @@ export default function CoachDashboard() {
         km: kmPos,
         type: i === count ? 'Base de Vida' : 'Completo (Sólidos + Líquidos)',
         targetCarbs: '60g - 80g HC / hora',
-        hydration: 'Recarga de 500ml de Água e Isotónico'
+        hydrationNotes: 'Recarga de 500ml de Água e Isotónico'
       });
     }
     return stations;
   };
 
   const calculateEstimatedTime = (dist: number, elev: number, flatPaceStr: string): string => {
-    // Extrair minutos por km do ritmo em plano (ex: "4:30 min/km" -> 4.5 min/km)
     const parts = flatPaceStr.split(':');
     const min = parseFloat(parts[0]) || 5;
     const sec = parseFloat(parts[1]) || 0;
     const paceMinPerKm = min + (sec / 60);
 
-    // Fator de correção de montanha: cada 1000m D+ acrescenta cerca de 30-45 min ao tempo total
     const runningTimeMin = dist * paceMinPerKm;
     const climbingPenaltyMin = (elev / 1000) * 35;
     const totalMinutes = runningTimeMin + climbingPenaltyMin;
@@ -858,8 +854,6 @@ export default function CoachDashboard() {
                   </div>
                 ) : (
                   races.map((race) => {
-                    const assignedAthlete = athletes.find((a) => a.id === race.athleteId);
-
                     return (
                       <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black">
                         <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-slate-800 pb-4">
@@ -892,7 +886,7 @@ export default function CoachDashboard() {
                                 <div className="text-[11px] text-slate-400 space-y-1">
                                   <p><strong>Tipo:</strong> {station.type}</p>
                                   <p><strong>Hidratos:</strong> {station.targetCarbs}</p>
-                                  <p><strong>Hidratação:</strong> {station.hydration}</p>
+                                  <p><strong>Hidratação:</strong> {station.hydrationNotes}</p>
                                 </div>
                               </div>
                             ))}
@@ -920,7 +914,7 @@ export default function CoachDashboard() {
                               </div>
                               <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white">
                                 <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
-                                <span className="text-slate-300">{race.preRaceNutrition.dayMinus2}</span>
+                                <span className="text-slate-300">{race.preRaceNutrition.raceMorning}</span>
                               </div>
                             </div>
                           </div>
