@@ -24,6 +24,7 @@ import {
   Scale,
   User,
   ArrowLeft,
+  ChevronRight,
   FileSpreadsheet,
   CheckCircle2,
   Zap,
@@ -32,8 +33,7 @@ import {
   Calendar,
   Printer,
   Flag,
-  Clock,
-  LayoutDashboard
+  Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FitParser from 'fit-file-parser';
@@ -923,7 +923,7 @@ export default function CoachDashboard() {
                         value={raceForm.aidStationsInput}
                         onChange={(e) => setRaceForm({ ...raceForm, aidStationsInput: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
-                        placeholder="ex: KM 12 - Posto de Água | KM 28 - Abastecimento Completo | KM 38 - Base de Vida"
+                        placeholder="ex: KM 12 - Posto de Água | KM 25 - Abastecimento Completo | KM 38 - Base de Vida"
                       />
                     </div>
 
