@@ -37,12 +37,11 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   // Utilizador Autenticado
   const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string; role?: string } | null>(null);
-  const [loginRole, setLoginRole] = useState<'athlete' | 'coach'>('athlete');
 
-  // Estados Dinâmicos do Atleta (Carregados do Supabase/Estado)
+  // Estados do Atleta
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [newWorkout, setNewWorkout] = useState({
     title: '',
@@ -52,7 +51,7 @@ export default function LandingPage() {
     type: 'Trail Run'
   });
 
-  // Estados Dinâmicos do Treinador (Atletas vindos do Supabase)
+  // Estados do Treinador
   const [athletes, setAthletes] = useState<any[]>([]);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>('');
 
@@ -77,63 +76,74 @@ export default function LandingPage() {
     notes: ''
   });
 
-  // 1. Verificar sessão ativa ao carregar a página
+  // Verificar sessão ativa de forma segura
   useEffect(() => {
     checkSession();
   }, []);
 
   const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      loadUserProfile(session.user.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      }
+    } catch (err) {
+      console.error('Erro ao verificar sessão:', err);
     }
   };
 
-  // 2. Carregar perfil do utilizador logado e dados respetivos
+  // Carregar perfil do utilizador logado com proteção contra erros
   const loadUserProfile = async (userId: string) => {
     setLoading(true);
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); // Usa maybeSingle em vez de single para não crashar se o perfil não existir
 
-    if (profile) {
-      setUserProfile(profile);
-      if (profile.role === 'coach') {
-        setView('coach');
-        loadCoachAthletes(profile.id);
+      if (profile) {
+        setUserProfile(profile);
+        if (profile.role === 'coach') {
+          setView('coach');
+          loadCoachAthletes(profile.id);
+        } else {
+          setView('athlete');
+        }
       } else {
+        // Se a conta existir no Auth mas não tiver entrada na tabela profiles
+        setUserProfile({ id: userId, full_name: 'Utilizador', role: 'athlete' });
         setView('athlete');
-        loadAthleteData(profile.id);
       }
+    } catch (err) {
+      console.error('Erro ao carregar perfil:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // Carregar Atletas associados a este Treinador no Supabase
+  // Carregar Atletas do Treinador no Supabase
   const loadCoachAthletes = async (coachId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, role')
-      .eq('coach_id', coachId)
-      .eq('role', 'athlete');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('coach_id', coachId)
+        .eq('role', 'athlete');
 
-    if (!error && data) {
-      setAthletes(data);
-      if (data.length > 0) {
-        setSelectedAthleteId(data[0].id);
-        setSelectedAthleteForRace(data[0].id);
+      if (!error && data) {
+        setAthletes(data);
+        if (data.length > 0) {
+          setSelectedAthleteId(data[0].id);
+          setSelectedAthleteForRace(data[0].id);
+        }
       }
+    } catch (err) {
+      console.error('Erro ao carregar atletas:', err);
     }
   };
 
-  // Carregar Treinos do Atleta Autenticado
-  const loadAthleteData = async (athleteId: string) => {
-    // Aqui podes consultar treinos filtrados por id de atleta no Supabase
-  };
-
-  // Autenticação
+  // Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -151,7 +161,7 @@ export default function LandingPage() {
         await loadUserProfile(authData.user.id);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao efetuar login. Verifica os dados.');
+      setErrorMessage(err.message || 'Erro ao efetuar login. Verifica os teus dados.');
     } finally {
       setLoading(false);
     }
@@ -163,7 +173,7 @@ export default function LandingPage() {
     setView('public');
   };
 
-  // Funções de Gestão do Atleta
+  // Funções do Atleta
   const handleAddWorkout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkout.title || !newWorkout.distance) return;
@@ -182,7 +192,7 @@ export default function LandingPage() {
     setNewWorkout({ title: '', distance: '', elevation: '', duration: '', type: 'Trail Run' });
   };
 
-  // Algoritmo de Parse de GPX / Estrutura
+  // Algoritmo de Parse do GPX
   const parseGpxAndBuildPlan = (dist: number, elev: number) => {
     const p1 = (dist * 0.3).toFixed(0);
     const p2 = (dist * 0.7).toFixed(0);
@@ -218,27 +228,12 @@ export default function LandingPage() {
     setGpxFile(null);
   };
 
-  const handleRegisterAthleteToRace = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!athleteRaceTarget) return;
-
-    setRaceRegistrations([
-      ...raceRegistrations,
-      {
-        id: String(Date.now()),
-        raceId: selectedRaceForAthlete,
-        athleteId: selectedAthleteForRace,
-        target: athleteRaceTarget
-      }
-    ]);
-    setAthleteRaceTarget('');
-  };
-
   const totalDistance = workouts.reduce((acc, curr) => acc + (curr.distance || 0), 0);
   const totalElevation = workouts.reduce((acc, curr) => acc + (curr.elevation || 0), 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {/* NAVEGAÇÃO PRINCIPAL */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md fixed top-0 w-full z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
@@ -276,7 +271,33 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      {/* CONTEÚDO PRINCIPAL */}
       <main className="pt-24 pb-12 px-4 max-w-7xl mx-auto">
+        {/* LANDING PAGE PÚBLICA */}
+        {view === 'public' && (
+          <div className="space-y-16 py-12">
+            <div className="text-center max-w-3xl mx-auto space-y-6">
+              <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">
+                Gestão Profissional de Trail Running & GPX
+              </span>
+              <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white">
+                Domina as Montanhas com GPX & Planos de Prova
+              </h1>
+              <p className="text-slate-400 text-base sm:text-lg">
+                Plataforma integrada para treinadores e atletas de Trail Running. Importação de percursos GPX, planos de pacing e nutrição por setor.
+              </p>
+              <div className="flex justify-center gap-4 pt-4">
+                <button
+                  onClick={() => setView('login')}
+                  className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  Entrar na Plataforma <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* MODAL DE LOGIN */}
         {view === 'login' && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -364,6 +385,48 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Plus className="h-5 w-5 text-emerald-400" /> Registar Treino
+              </h2>
+              <form onSubmit={handleAddWorkout} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <input
+                  type="text"
+                  placeholder="Nome do Treino"
+                  value={newWorkout.title}
+                  onChange={(e) => setNewWorkout({ ...newWorkout, title: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <input
+                  type="number"
+                  placeholder="Distância (km)"
+                  value={newWorkout.distance}
+                  onChange={(e) => setNewWorkout({ ...newWorkout, distance: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <input
+                  type="number"
+                  placeholder="Desnível D+ (m)"
+                  value={newWorkout.elevation}
+                  onChange={(e) => setNewWorkout({ ...newWorkout, elevation: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Duração (ex: 1h30)"
+                  value={newWorkout.duration}
+                  onChange={(e) => setNewWorkout({ ...newWorkout, duration: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="submit"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition-all"
+                >
+                  Guardar
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
@@ -372,9 +435,62 @@ export default function LandingPage() {
           <div className="space-y-8">
             <div className="border-b border-slate-800 pb-4">
               <h1 className="text-2xl font-bold text-white">Painel do Treinador ({userProfile.full_name})</h1>
-              <p className="text-xs text-slate-400">Atletas Vinculados na tua Conta Supabase: <strong>{athletes.length}</strong></p>
+              <p className="text-xs text-slate-400">Atletas Vinculados no Supabase: <strong>{athletes.length}</strong></p>
             </div>
 
+            {/* ADICIONAR PROVA VIA GPX */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Flag className="h-5 w-5 text-emerald-400" /> Criar Prova & Gerar Plano GPX
+              </h2>
+              <form onSubmit={handleAddRace} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome da Prova"
+                  value={newRace.name}
+                  onChange={(e) => setNewRace({ ...newRace, name: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                />
+                <input
+                  type="date"
+                  value={newRace.date}
+                  onChange={(e) => setNewRace({ ...newRace, date: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                />
+                <input
+                  type="number"
+                  required
+                  placeholder="Distância (km)"
+                  value={newRace.distance}
+                  onChange={(e) => setNewRace({ ...newRace, distance: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                />
+                <input
+                  type="number"
+                  placeholder="Desnível D+ (m)"
+                  value={newRace.elevation}
+                  onChange={(e) => setNewRace({ ...newRace, elevation: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white"
+                />
+                <div className="sm:col-span-2">
+                  <input
+                    type="file"
+                    accept=".gpx"
+                    onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
+                    className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" /> Criar Prova
+                </button>
+              </form>
+            </div>
+
+            {/* LISTA DE ATLETAS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Users className="h-5 w-5 text-emerald-400" /> Os Meus Atletas Vinculados (Supabase)
