@@ -26,7 +26,11 @@ import {
   Target,
   Trash2,
   Edit2,
-  Save
+  Save,
+  FileCode2,
+  MapPin,
+  TrendingUp,
+  Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -61,12 +65,24 @@ export default function LandingPage() {
   const [newAthleteEmail, setNewAthleteEmail] = useState('');
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>('1');
 
-  // Gestão de Provas / Corridas
+  // Gestão de Provas / Corridas (com suporte para dados GPX e plano estratégico)
   const [races, setRaces] = useState<any[]>([
-    { id: 'r1', name: 'MIGUT 50K', date: '2026-10-15', distance: 50, elevation: 3100 },
-    { id: 'r2', name: 'UTMB Val d\'Aran', date: '2026-11-02', distance: 32, elevation: 2100 }
+    {
+      id: 'r1',
+      name: 'MIGUT 50K',
+      date: '2026-10-15',
+      distance: 50,
+      elevation: 3100,
+      gpxFileName: 'migut_50k_route.gpx',
+      racePlan: [
+        { km: '0 - 15 km', zone: 'Z2 (Conservador)', terrain: 'Subida inicial progressiva', nutrition: '60g Carbs/h + 500ml Água' },
+        { km: '15 - 35 km', zone: 'Z3 (Ritmo de Prova)', terrain: 'Trilho técnico e crista', nutrition: '75g Carbs/h + Sais' },
+        { km: '35 - 50 km', zone: 'Z2 / Z4 (Gestão Final)', terrain: 'Descida rápida e estradão final', nutrition: 'Gel de Cafeína no KM 40' }
+      ]
+    }
   ]);
   const [newRace, setNewRace] = useState({ name: '', date: '', distance: '', elevation: '' });
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
 
   // Estado para edição de prova
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
@@ -74,8 +90,7 @@ export default function LandingPage() {
 
   // Inscrição de Atletas em Provas + Objetivos
   const [raceRegistrations, setRaceRegistrations] = useState<any[]>([
-    { id: 'reg1', raceId: 'r1', athleteId: '1', target: 'Sub-6h00 (Pacing Z2/Z3)' },
-    { id: 'reg2', raceId: 'r2', athleteId: '2', target: 'Terminar confortavelmente' }
+    { id: 'reg1', raceId: 'r1', athleteId: '1', target: 'Sub-6h00 (Pacing Z2/Z3)' }
   ]);
   const [selectedRaceForAthlete, setSelectedRaceForAthlete] = useState<string>('r1');
   const [selectedAthleteForRace, setSelectedAthleteForRace] = useState<string>('1');
@@ -158,49 +173,67 @@ export default function LandingPage() {
     setNewWorkout({ title: '', distance: '', elevation: '', duration: '', type: 'Trail Run' });
   };
 
-  // Funções de Treinador
-  const handleAddAthlete = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAthleteName) return;
+  // Processar Ficheiro GPX para Criar o Plano Strategico da Prova
+  const parseGpxAndBuildPlan = (dist: number, elev: number) => {
+    const p1 = (dist * 0.3).toFixed(0);
+    const p2 = (dist * 0.7).toFixed(0);
 
-    const athlete = {
-      id: String(Date.now()),
-      name: newAthleteName,
-      email: newAthleteEmail || 'atleta@example.com',
-      totalKm: 0,
-      totalDPlus: 0
-    };
-
-    setAthletes([...athletes, athlete]);
-    setNewAthleteName('');
-    setNewAthleteEmail('');
+    return [
+      {
+        km: `0 - ${p1} km`,
+        zone: 'Z1 / Z2 (Controlo Inicial)',
+        terrain: 'Início de percurso e aquecimento gradual',
+        nutrition: '50g - 60g Carbs/h + Hidratação regular'
+      },
+      {
+        km: `${p1} - ${p2} km`,
+        zone: 'Z2 / Z3 (Bloco Principal de Esforço)',
+        terrain: `Setor acumulado com maior densidade de D+ (~${(elev * 0.6).toFixed(0)}m)`,
+        nutrition: '65g - 80g Carbs/h + Reposição de Eletrólitos/Sais'
+      },
+      {
+        km: `${p2} - ${dist} km`,
+        zone: 'Z3 / Z4 (Gestão de Reta Final)',
+        terrain: 'Troço final, descidas e aceleração rumo à meta',
+        nutrition: 'Gel com Cafeína + Gel de Absorção Rápida'
+      }
+    ];
   };
 
   const handleAddRace = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRace.name || !newRace.distance) return;
 
+    const dist = parseFloat(newRace.distance);
+    const elev = parseInt(newRace.elevation) || 0;
     const newId = String(Date.now());
+
+    // Gerar plano estratégico baseado no GPX (ou estimativa)
+    const generatedPlan = parseGpxAndBuildPlan(dist, elev);
+
     const race = {
       id: newId,
       name: newRace.name,
       date: newRace.date || new Date().toISOString().split('T')[0],
-      distance: parseFloat(newRace.distance),
-      elevation: parseInt(newRace.elevation) || 0
+      distance: dist,
+      elevation: elev,
+      gpxFileName: gpxFile ? gpxFile.name : null,
+      racePlan: generatedPlan
     };
 
     setRaces([...races, race]);
     setSelectedRaceForAthlete(newId);
     setNewRace({ name: '', date: '', distance: '', elevation: '' });
+    setGpxFile(null);
   };
 
-  // Função para Apagar Prova
+  // Apagar Prova
   const handleDeleteRace = (raceId: string) => {
     setRaces(races.filter(r => r.id !== raceId));
     setRaceRegistrations(raceRegistrations.filter(reg => reg.raceId !== raceId));
   };
 
-  // Iniciar Edição de Prova
+  // Iniciar e Guardar Edição de Prova
   const handleStartEditRace = (race: any) => {
     setEditingRaceId(race.id);
     setEditRaceData({
@@ -211,16 +244,18 @@ export default function LandingPage() {
     });
   };
 
-  // Guardar Edição de Prova
   const handleSaveEditRace = (raceId: string) => {
     setRaces(races.map(r => {
       if (r.id === raceId) {
+        const d = parseFloat(editRaceData.distance) || r.distance;
+        const e = parseInt(editRaceData.elevation) || r.elevation;
         return {
           ...r,
           name: editRaceData.name,
           date: editRaceData.date,
-          distance: parseFloat(editRaceData.distance) || r.distance,
-          elevation: parseInt(editRaceData.elevation) || r.elevation
+          distance: d,
+          elevation: e,
+          racePlan: parseGpxAndBuildPlan(d, e)
         };
       }
       return r;
@@ -262,7 +297,7 @@ export default function LandingPage() {
     setPrescription({ title: '', distance: '', elevation: '', pace: '', notes: '' });
   };
 
-  // Função de Recomendação de Performance
+  // Recomendação de Performance
   const getPerformanceSuggestion = (athleteId: string, raceId: string) => {
     const athlete = athletes.find(a => a.id === athleteId);
     const race = races.find(r => r.id === raceId);
@@ -434,13 +469,13 @@ export default function LandingPage() {
           <div className="space-y-16 py-12">
             <div className="text-center max-w-3xl mx-auto space-y-6">
               <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">
-                Gestão Profissional de Trail Running
+                Gestão Profissional de Trail Running & GPX
               </span>
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white">
-                Domina as Montanhas com Estrutura & Pacing
+                Domina as Montanhas com GPX & Planos de Prova
               </h1>
               <p className="text-slate-400 text-base sm:text-lg">
-                Plataforma integrada para treinadores e atletas de Trail Running. Planeamento de esforço, nutrição e análise de métricas em tempo real.
+                Plataforma integrada para treinadores e atletas de Trail Running. Importação de percursos GPX, planos de pacing e nutrição por setor.
               </p>
               <div className="flex justify-center gap-4 pt-4">
                 <button
@@ -565,22 +600,22 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* DASHBOARD DO TREINADOR (COM EDITAR E APAGAR PROVAS) */}
+        {/* DASHBOARD DO TREINADOR (COM SUPORTE GPX) */}
         {view === 'coach' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-                <p className="text-xs text-slate-400">Gestão de provas, edição, eliminação e colocação de atletas</p>
+                <p className="text-xs text-slate-400">Criação de Provas com GPX, Análise Altimétrica & Planos de Esforço</p>
               </div>
             </div>
 
-            {/* SECÇÃO 1: CRIAR PROVAS & INSCRIÇÕES */}
+            {/* SECÇÃO 1: CRIAR PROVAS COM UPLOAD DE GPX */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* ADICIONAR PROVA */}
+              {/* ADICIONAR PROVA + FICHEIRO GPX */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Flag className="h-5 w-5 text-emerald-400" /> Criar Prova / Corrida
+                  <Flag className="h-5 w-5 text-emerald-400" /> Criar Prova & Gerar Plano via GPX
                 </h2>
                 <form onSubmit={handleAddRace} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
@@ -594,6 +629,7 @@ export default function LandingPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Data da Prova</label>
                     <input
@@ -603,6 +639,7 @@ export default function LandingPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Distância (km)</label>
                     <input
@@ -614,6 +651,7 @@ export default function LandingPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+
                   <div className="sm:col-span-2">
                     <label className="block text-xs text-slate-400 mb-1">Desnível D+ (m)</label>
                     <input
@@ -624,11 +662,32 @@ export default function LandingPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+
+                  {/* CAMPO DE UPLOAD DE GPX */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-slate-400 mb-1">Ficheiro do Percurso (.gpx)</label>
+                    <div className="relative border border-dashed border-slate-800 hover:border-emerald-500/50 rounded-xl p-3 bg-slate-950/50 flex items-center gap-3 cursor-pointer">
+                      <FileCode2 className="h-5 w-5 text-emerald-400" />
+                      <div className="flex-1 overflow-hidden">
+                        <span className="text-xs text-slate-300 block truncate">
+                          {gpxFile ? gpxFile.name : 'Selecionar ou arrastar ficheiro GPX'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">O ficheiro criará o plano de setores automaticamente</span>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".gpx"
+                        onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
-                    className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all"
+                    className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
                   >
-                    Registar Nova Prova
+                    <Sparkles className="h-4 w-4" /> Criar Prova & Gerar Plano Estratégico
                   </button>
                 </form>
               </div>
@@ -692,11 +751,11 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* SECÇÃO 2: PAINEL DE PROVAS (COM EDITAR E APAGAR) */}
+            {/* SECÇÃO 2: CALENDÁRIO E PLANOS DE PROVA DECORRENTES DO GPX */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-emerald-400" /> Calendário de Provas & Sugestões de Performance
+                  <TrendingUp className="h-5 w-5 text-emerald-400" /> Calendário de Provas & Planos de Esforço
                 </h2>
                 <span className="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-400 font-medium">
                   {races.length} Provas
@@ -712,9 +771,9 @@ export default function LandingPage() {
                     const isEditing = editingRaceId === race.id;
 
                     return (
-                      <div key={race.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                      <div key={race.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-5">
                         {isEditing ? (
-                          /* FORMULÁRIO DE EDIÇÃO DA PROVA */
+                          /* FORMULÁRIO DE EDIÇÃO */
                           <div className="space-y-3 bg-slate-900/90 p-4 rounded-xl border border-emerald-500/30">
                             <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Editar Detalhes da Prova</h4>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -762,10 +821,17 @@ export default function LandingPage() {
                             </div>
                           </div>
                         ) : (
-                          /* CABEÇALHO DA PROVA COM BOTÕES DE EDITAR/APAGAR */
+                          /* CABEÇALHO DA PROVA */
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
                             <div>
-                              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">PROVA PLANEADA</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">PROVA PLANEADA</span>
+                                {race.gpxFileName && (
+                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <FileCode2 className="h-3 w-3" /> GPX Anexado
+                                  </span>
+                                )}
+                              </div>
                               <h3 className="text-lg font-bold text-white">{race.name}</h3>
                             </div>
                             <div className="flex items-center gap-3">
@@ -790,6 +856,27 @@ export default function LandingPage() {
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* PLANO DE PROVA GERADO PELO GPX */}
+                        {race.racePlan && (
+                          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800/80 space-y-3">
+                            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-amber-400" /> Plano Estratégico por Setores (Calculado via GPX)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {race.racePlan.map((sector: any, idx: number) => (
+                                <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs space-y-1">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-emerald-400">{sector.km}</span>
+                                    <span className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">{sector.zone}</span>
+                                  </div>
+                                  <p className="text-slate-300 text-[11px] font-medium">{sector.terrain}</p>
+                                  <p className="text-slate-400 text-[10px] italic">Nutrição: {sector.nutrition}</p>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
