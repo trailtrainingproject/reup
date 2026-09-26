@@ -112,13 +112,7 @@ export default function CoachDashboard() {
     birthDate: '',
     age: '',
     gender: 'Masculino',
-    weight: '',
-    weeklyKm: '50',
-    weeklyHours: '6.5',
-    weeklyDPlus: '1500',
-    maxHeartRate: '185',
-    restingHeartRate: '50',
-    lthr: '170'
+    weight: ''
   });
 
   const [races, setRaces] = useState<Race[]>([]);
@@ -179,6 +173,7 @@ export default function CoachDashboard() {
       setCoachProfile(profile || { id: userId, full_name: 'Treinador Principal' });
       setView('coach');
       await loadAthletes(userId);
+      await loadRaces(userId);
     } catch (err) {
       console.error('Erro ao carregar perfil:', err);
     } finally {
@@ -201,7 +196,40 @@ export default function CoachDashboard() {
         }
       }
     } catch (err) {
-      console.error('Erro ao carregar atletas do Supabase:', err);
+      console.error('Erro ao carregar atletas:', err);
+    }
+  };
+
+  // Carregar Provas do Supabase
+  const loadRaces = async (coachId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('races')
+        .select('*')
+        .eq('coach_id', coachId);
+
+      if (!error && data) {
+        const formattedRaces: Race[] = data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          date: r.date,
+          location: r.location,
+          distance: r.distance,
+          elevation: r.elevation,
+          athleteId: r.athlete_id,
+          targetCarbsPerHour: r.target_carbs_per_hour,
+          maxHeartRate: r.max_heart_rate,
+          restingHeartRate: r.resting_heart_rate,
+          gpxFileName: r.gpx_file_name,
+          weatherEstimate: r.weather_estimate,
+          preRaceNutrition: r.pre_race_nutrition,
+          athleteMetrics: r.athlete_metrics,
+          planSectors: r.plan_sectors || []
+        }));
+        setRaces(formattedRaces);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar provas do Supabase:', err);
     }
   };
 
@@ -227,39 +255,25 @@ export default function CoachDashboard() {
 
     try {
       const athleteId = crypto.randomUUID();
-      const athletePayload = {
-        id: athleteId,
-        name: newAthlete.name,
-        full_name: newAthlete.name,
-        email: newAthlete.email || null,
-        phone: newAthlete.phone || null,
-        birth_date: newAthlete.birthDate || null,
-        age: newAthlete.age ? parseInt(newAthlete.age) : null,
-        gender: newAthlete.gender,
-        weight: newAthlete.weight ? parseFloat(newAthlete.weight) : null,
-        role: 'athlete',
-        coach_id: coachProfile.id
-      };
+      const { error } = await supabase.from('profiles').insert([
+        {
+          id: athleteId,
+          name: newAthlete.name,
+          full_name: newAthlete.name,
+          email: newAthlete.email || null,
+          phone: newAthlete.phone || null,
+          birth_date: newAthlete.birthDate || null,
+          age: newAthlete.age ? parseInt(newAthlete.age) : null,
+          gender: newAthlete.gender,
+          weight: newAthlete.weight ? parseFloat(newAthlete.weight) : null,
+          role: 'athlete',
+          coach_id: coachProfile.id
+        }
+      ]);
 
-      const { error } = await supabase.from('profiles').insert([athletePayload]);
       if (error) throw error;
 
-      setNewAthlete({
-        name: '',
-        email: '',
-        phone: '',
-        birthDate: '',
-        age: '',
-        gender: 'Masculino',
-        weight: '',
-        weeklyKm: '50',
-        weeklyHours: '6.5',
-        weeklyDPlus: '1500',
-        maxHeartRate: '185',
-        restingHeartRate: '50',
-        lthr: '170'
-      });
-
+      setNewAthlete({ name: '', email: '', phone: '', birthDate: '', age: '', gender: 'Masculino', weight: '' });
       await loadAthletes(coachProfile.id);
       setActiveTab('athletes-list');
     } catch (err: any) {
@@ -470,9 +484,10 @@ export default function CoachDashboard() {
     };
   };
 
-  const handleSaveRace = (e: React.FormEvent) => {
+  // GUARDAR OU EDITAR PROVA DIRETAMENTE NO SUPABASE
+  const handleSaveRace = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!raceForm.name || !raceForm.distance) return;
+    if (!raceForm.name || !raceForm.distance || !coachProfile) return;
 
     let targetAthleteId = raceForm.athleteId;
     if (!targetAthleteId && athletes.length > 0) {
@@ -509,49 +524,48 @@ export default function CoachDashboard() {
       downhillPace: raceForm.downhillPace
     };
 
-    if (editingRaceId) {
-      setRaces(races.map(r => r.id === editingRaceId ? {
-        ...r,
-        name: raceForm.name,
-        date: raceForm.date,
-        location: raceForm.location,
-        distance: dist,
-        elevation: elev,
-        athleteId: targetAthleteId,
-        targetCarbsPerHour: carbs,
-        maxHeartRate: maxHR,
-        restingHeartRate: restHR,
-        weatherEstimate,
-        preRaceNutrition,
-        athleteMetrics,
-        planSectors,
-        gpxFileName: gpxFile ? gpxFile.name : r.gpxFileName
-      } : r));
-      setEditingRaceId(null);
-    } else {
-      const newRace: Race = {
-        id: String(Date.now()),
-        name: raceForm.name,
-        date: raceForm.date,
-        location: raceForm.location,
-        distance: dist,
-        elevation: elev,
-        athleteId: targetAthleteId,
-        targetCarbsPerHour: carbs,
-        maxHeartRate: maxHR,
-        restingHeartRate: restHR,
-        gpxFileName: gpxFile ? gpxFile.name : null,
-        weatherEstimate,
-        preRaceNutrition,
-        athleteMetrics,
-        planSectors
-      };
-      setRaces([newRace, ...races]);
-    }
+    const racePayload = {
+      name: raceForm.name,
+      date: raceForm.date,
+      location: raceForm.location,
+      distance: dist,
+      elevation: elev,
+      athlete_id: targetAthleteId,
+      coach_id: coachProfile.id,
+      target_carbs_per_hour: carbs,
+      max_heart_rate: maxHR,
+      resting_heart_rate: restHR,
+      gpx_file_name: gpxFile ? gpxFile.name : null,
+      weather_estimate: weatherEstimate,
+      pre_race_nutrition: preRaceNutrition,
+      athlete_metrics: athleteMetrics,
+      plan_sectors: planSectors
+    };
 
-    setGpxFile(null);
-    setActivityFiles([]);
-    setActiveTab('races-list');
+    try {
+      if (editingRaceId) {
+        const { error } = await supabase
+          .from('races')
+          .update(racePayload)
+          .eq('id', editingRaceId);
+
+        if (error) throw error;
+        setEditingRaceId(null);
+      } else {
+        const { error } = await supabase
+          .from('races')
+          .insert([{ id: crypto.randomUUID(), ...racePayload }]);
+
+        if (error) throw error;
+      }
+
+      await loadRaces(coachProfile.id);
+      setGpxFile(null);
+      setActivityFiles([]);
+      setActiveTab('races-list');
+    } catch (err: any) {
+      alert('Erro ao guardar plano de prova no Supabase: ' + (err.message || 'Verifique se a tabela races existe com as colunas corretas.'));
+    }
   };
 
   const handleEditRace = (race: Race) => {
@@ -571,15 +585,21 @@ export default function CoachDashboard() {
     setActiveTab('new-race');
   };
 
-  const handleDeleteRace = (id: string) => {
-    setRaces(races.filter(r => r.id !== id));
+  const handleDeleteRace = async (id: string) => {
+    if (!confirm('Tem a certeza que deseja eliminar este plano de prova do Supabase?')) return;
+    try {
+      const { error } = await supabase.from('races').delete().eq('id', id);
+      if (error) throw error;
+      if (coachProfile) await loadRaces(coachProfile.id);
+    } catch (err: any) {
+      alert('Erro ao apagar prova: ' + (err.message || 'Verifique as permissões.'));
+    }
   };
 
   const toggleRaceExpand = (raceId: string) => {
     setExpandedRaceIds(prev => ({ ...prev, [raceId]: !prev[raceId] }));
   };
 
-  // Função para imprimir/exportar o PDF apenas de um plano específico isolado
   const printSingleRace = (raceId: string) => {
     setExpandedRaceIds(prev => ({ ...prev, [raceId]: true }));
     setTimeout(() => {
@@ -1384,7 +1404,7 @@ export default function CoachDashboard() {
                       className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
                     >
                       <Sparkles className="h-4 w-4" />
-                      {editingRaceId ? 'Guardar Alterações da Prova' : 'Gerar Relatório Completo (Meteorologia, Carbo-Loading & Sectores)'}
+                      {editingRaceId ? 'Guardar Alterações da Prova' : 'Gravar Plano no Supabase'}
                     </button>
                   </form>
                 </div>
@@ -1394,7 +1414,7 @@ export default function CoachDashboard() {
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:hidden">
                     <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Relatório & Histórico</span>
+                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Relatório & Histórico (Supabase)</span>
                       <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({filteredRaces.length})</h2>
                     </div>
                     
@@ -1421,7 +1441,7 @@ export default function CoachDashboard() {
 
                   {filteredRaces.length === 0 ? (
                     <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                      Nenhuma prova encontrada para o filtro selecionado.
+                      Nenhuma prova encontrada para o filtro selecionado na base de dados.
                     </div>
                   ) : (
                     filteredRaces.map((race) => {
