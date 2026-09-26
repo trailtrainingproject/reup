@@ -20,7 +20,10 @@ import {
   Calendar,
   Users,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Flag,
+  Sparkles,
+  Target
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -34,7 +37,10 @@ export default function LandingPage() {
   const [loginRole, setLoginRole] = useState<'athlete' | 'coach'>('athlete');
 
   // Estados do Dashboard do Atleta
-  const [workouts, setWorkouts] = useState<any[]>([]);
+  const [workouts, setWorkouts] = useState<any[]>([
+    { id: 1, title: 'Treino de Volume Monte Frestas', distance: 22, elevation: 1200, duration: '2h45', date: '20/09/2026' },
+    { id: 2, title: 'Séries de Subida', distance: 12, elevation: 800, duration: '1h20', date: '23/09/2026' }
+  ]);
   const [newWorkout, setNewWorkout] = useState({
     title: '',
     distance: '',
@@ -45,13 +51,30 @@ export default function LandingPage() {
 
   // Estados do Dashboard do Treinador
   const [athletes, setAthletes] = useState<any[]>([
-    { id: '1', name: 'João Silva', email: 'joao@example.com', target: 'UTMB 50K' },
-    { id: '2', name: 'Maria Santos', email: 'maria@example.com', target: 'MIGUT 30K' }
+    { id: '1', name: 'João Silva', email: 'joao@example.com', totalKm: 140, totalDPlus: 6500 },
+    { id: '2', name: 'Maria Santos', email: 'maria@example.com', totalKm: 85, totalDPlus: 3200 }
   ]);
   const [newAthleteName, setNewAthleteName] = useState('');
   const [newAthleteEmail, setNewAthleteEmail] = useState('');
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>('1');
 
+  // Gestão de Provas / Corridas
+  const [races, setRaces] = useState<any[]>([
+    { id: 'r1', name: 'MIGUT 50K', date: '2026-10-15', distance: 50, elevation: 3100 },
+    { id: 'r2', name: 'UTMB Val d\'Aran', date: '2026-11-02', distance: 32, elevation: 2100 }
+  ]);
+  const [newRace, setNewRace] = useState({ name: '', date: '', distance: '', elevation: '' });
+
+  // Inscrição de Atletas em Provas + Objetivos
+  const [raceRegistrations, setRaceRegistrations] = useState<any[]>([
+    { id: 'reg1', raceId: 'r1', athleteId: '1', target: 'Sub-6h00 (Pacing Z2/Z3)' },
+    { id: 'reg2', raceId: 'r2', athleteId: '2', target: 'Terminar confortavelmente' }
+  ]);
+  const [selectedRaceForAthlete, setSelectedRaceForAthlete] = useState<string>('r1');
+  const [selectedAthleteForRace, setSelectedAthleteForRace] = useState<string>('1');
+  const [athleteRaceTarget, setAthleteRaceTarget] = useState<string>('');
+
+  // Prescrições de Treino
   const [prescribedWorkouts, setPrescribedWorkouts] = useState<any[]>([]);
   const [prescription, setPrescription] = useState({
     title: '',
@@ -137,12 +160,44 @@ export default function LandingPage() {
       id: String(Date.now()),
       name: newAthleteName,
       email: newAthleteEmail || 'atleta@example.com',
-      target: 'Geral'
+      totalKm: 0,
+      totalDPlus: 0
     };
 
     setAthletes([...athletes, athlete]);
     setNewAthleteName('');
     setNewAthleteEmail('');
+  };
+
+  const handleAddRace = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRace.name || !newRace.distance) return;
+
+    const race = {
+      id: String(Date.now()),
+      name: newRace.name,
+      date: newRace.date || new Date().toISOString().split('T')[0],
+      distance: parseFloat(newRace.distance),
+      elevation: parseInt(newRace.elevation) || 0
+    };
+
+    setRaces([...races, race]);
+    setNewRace({ name: '', date: '', distance: '', elevation: '' });
+  };
+
+  const handleRegisterAthleteToRace = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!athleteRaceTarget) return;
+
+    const newReg = {
+      id: String(Date.now()),
+      raceId: selectedRaceForAthlete,
+      athleteId: selectedAthleteForRace,
+      target: athleteRaceTarget
+    };
+
+    setRaceRegistrations([...raceRegistrations, newReg]);
+    setAthleteRaceTarget('');
   };
 
   const handlePrescribeWorkout = (e: React.FormEvent) => {
@@ -162,6 +217,38 @@ export default function LandingPage() {
     ]);
 
     setPrescription({ title: '', distance: '', elevation: '', pace: '', notes: '' });
+  };
+
+  // Função de Recomendação baseada no histórico
+  const getPerformanceSuggestion = (athleteId: string, raceId: string) => {
+    const athlete = athletes.find(a => a.id === athleteId);
+    const race = races.find(r => r.id === raceId);
+
+    if (!athlete || !race) return null;
+
+    // Métricas calculadas
+    const kmRatio = athlete.totalKm / race.distance;
+    const dPlusRatio = athlete.totalDPlus / (race.elevation || 1);
+
+    if (kmRatio >= 2.5 && dPlusRatio >= 1.5) {
+      return {
+        status: 'Excelente Preparação',
+        color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+        text: `O atleta tem volume acumulado robusto (${athlete.totalKm}km / ${athlete.totalDPlus}m D+). Sugestão: Ritmo competitivo sustentado em Z3 nas subidas e ritmos fortes nos planos.`
+      };
+    } else if (kmRatio >= 1.5) {
+      return {
+        status: 'Preparação Moderada',
+        color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+        text: `Volume de treinos razoável (${athlete.totalKm}km). Sugestão: Gestão conservadora no primeiro terço da prova. Foco estrito em gestão de nutrição (60g/h).`
+      };
+    } else {
+      return {
+        status: 'Carga Reduzida (Risco de Fadiga)',
+        color: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
+        text: `Histórico de treinos reduzido em relação à exigência da prova (${race.distance}km / ${race.elevation}m D+). Sugestão: Ritmo confortável em Z1/Z2 e caminhada ativa em subidas íngremes.`
+      };
+    }
   };
 
   const totalDistance = workouts.reduce((acc, curr) => acc + (curr.distance || 0), 0);
@@ -436,85 +523,206 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* DASHBOARD DO TREINADOR COMPLETO */}
+        {/* DASHBOARD DO TREINADOR AVANÇADO (PROVAS, OBJETIVOS & SUGESTÕES DE PERFORMANCE) */}
         {view === 'coach' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-                <p className="text-xs text-slate-400">Gestão técnica de atletas, planos de carga e prescrição de treinos</p>
+                <p className="text-xs text-slate-400">Gestão de provas, colocação de atletas, objetivos e análise de performance</p>
               </div>
             </div>
 
-            {/* SECÇÃO 1: ADICIONAR E LISTAR ATLETAS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* SECÇÃO 1: CRIAR PROVAS & INSCRICIÕS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* ADICIONAR PROVA */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Users className="h-5 w-5 text-emerald-400" /> Adicionar Atleta
+                  <Flag className="h-5 w-5 text-emerald-400" /> Criar Prova / Corrida
                 </h2>
-                <form onSubmit={handleAddAthlete} className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Nome do Atleta</label>
+                <form onSubmit={handleAddRace} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-slate-400 mb-1">Nome da Prova</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ex: Carlos Mota"
-                      value={newAthleteName}
-                      onChange={(e) => setNewAthleteName(e.target.value)}
+                      placeholder="Ex: Transgrancanaria 45K"
+                      value={newRace.name}
+                      onChange={(e) => setNewRace({ ...newRace, name: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Email</label>
+                    <label className="block text-xs text-slate-400 mb-1">Data da Prova</label>
                     <input
-                      type="email"
-                      placeholder="atleta@email.com"
-                      value={newAthleteEmail}
-                      onChange={(e) => setNewAthleteEmail(e.target.value)}
+                      type="date"
+                      value={newRace.date}
+                      onChange={(e) => setNewRace({ ...newRace, date: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Distância (km)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="45"
+                      value={newRace.distance}
+                      onChange={(e) => setNewRace({ ...newRace, distance: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-slate-400 mb-1">Desnível D+ (m)</label>
+                    <input
+                      type="number"
+                      placeholder="2800"
+                      value={newRace.elevation}
+                      onChange={(e) => setNewRace({ ...newRace, elevation: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl text-xs transition-all"
+                    className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all"
                   >
-                    Registar Atleta
+                    Registar Nova Prova
                   </button>
                 </form>
               </div>
 
-              {/* LISTA DE ATLETAS ASSOCIADOS */}
-              <div className="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              {/* ATRIBUIR ATLETA À PROVA & DEFINIR OBJETIVOS */}
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Gauge className="h-5 w-5 text-emerald-400" /> Os Meus Atletas ({athletes.length})
+                  <Target className="h-5 w-5 text-emerald-400" /> Inscrever Atleta & Definir Objetivo
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {athletes.map((athlete) => (
-                    <div
-                      key={athlete.id}
-                      onClick={() => setSelectedAthleteId(athlete.id)}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                        selectedAthleteId === athlete.id
-                          ? 'bg-emerald-500/10 border-emerald-500'
-                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                      }`}
+                <form onSubmit={handleRegisterAthleteToRace} className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Selecionar Prova</label>
+                    <select
+                      value={selectedRaceForAthlete}
+                      onChange={(e) => setSelectedRaceForAthlete(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-bold text-white text-sm">{athlete.name}</h3>
-                          <p className="text-xs text-slate-400">{athlete.email}</p>
-                        </div>
-                        <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold">
-                          {athlete.target}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      {races.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name} ({r.distance}km / {r.elevation}m D+)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Selecionar Atleta</label>
+                    <select
+                      value={selectedAthleteForRace}
+                      onChange={(e) => setSelectedAthleteForRace(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {athletes.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Objetivo Específico</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Sub-5h30, Pacing Z2 constante, Top 10 Escalão"
+                      value={athleteRaceTarget}
+                      onChange={(e) => setAthleteRaceTarget(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" /> Confirmar Inscrição na Prova
+                  </button>
+                </form>
               </div>
             </div>
 
-            {/* SECÇÃO 2: PRESCRIÇÃO DE TREINOS */}
+            {/* SECÇÃO 2: PAINEL DE PROVAS, ATLETAS INSCRITOS & RECOMENDAÇÕES INTELIGENTES DE PERFORMANCE */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-emerald-400" /> Calendário de Provas & Sugestões de Performance
+                </h2>
+                <span className="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-400 font-medium">
+                  {races.length} Provas Ativas
+                </span>
+              </div>
+
+              <div className="space-y-6">
+                {races.map((race) => {
+                  const regs = raceRegistrations.filter((reg) => reg.raceId === race.id);
+
+                  return (
+                    <div key={race.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">PROVA PLANEADA</span>
+                          <h3 className="text-lg font-bold text-white">{race.name}</h3>
+                        </div>
+                        <div className="flex gap-3 text-xs font-semibold text-slate-300">
+                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.date}</span>
+                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.distance} km</span>
+                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.elevation} m D+</span>
+                        </div>
+                      </div>
+
+                      {/* LISTA DE ATLETAS DA PROVA */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-400 mb-3">Atletas Inscritos e Sugestões de Performance:</h4>
+                        {regs.length === 0 ? (
+                          <p className="text-xs text-slate-500 italic">Nenhum atleta associado a esta prova ainda.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {regs.map((reg) => {
+                              const athlete = athletes.find((a) => a.id === reg.athleteId);
+                              const suggestion = getPerformanceSuggestion(reg.athleteId, race.id);
+
+                              return (
+                                <div key={reg.id} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                      <Users className="h-4 w-4 text-emerald-400" />
+                                      <span className="font-bold text-sm text-white">{athlete?.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-slate-400">Objetivo:</span>
+                                      <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                        {reg.target}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Caixa de Recomendação de Performance */}
+                                  {suggestion && (
+                                    <div className={`p-3 rounded-lg border text-xs space-y-1 ${suggestion.color}`}>
+                                      <div className="font-bold flex items-center gap-1.5">
+                                        <Sparkles className="h-3.5 w-3.5" />
+                                        <span>Análise da Plataforma: {suggestion.status}</span>
+                                      </div>
+                                      <p className="text-slate-300 leading-relaxed">{suggestion.text}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECÇÃO 3: PRESCRIÇÃO RÁPIDA DE TREINOS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Brain className="h-5 w-5 text-emerald-400" /> Prescrever Treino
@@ -584,36 +792,6 @@ export default function LandingPage() {
                   <Send className="h-4 w-4" /> Enviar Prescrição ao Atleta
                 </button>
               </form>
-            </div>
-
-            {/* SECÇÃO 3: HISTÓRICO DE PRESCRIÇÕES */}
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Treinos Prescritos Recentemente
-              </h2>
-              {prescribedWorkouts.length === 0 ? (
-                <p className="text-xs text-slate-500">Nenhuma prescrição enviada recentemente.</p>
-              ) : (
-                <div className="space-y-2">
-                  {prescribedWorkouts.map((p) => (
-                    <div key={p.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 flex justify-between items-center">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-emerald-400">{p.athleteName}</span>
-                          <span className="text-xs text-slate-600">•</span>
-                          <h3 className="font-bold text-white text-sm">{p.title}</h3>
-                        </div>
-                        {p.notes && <p className="text-xs text-slate-400 mt-1">{p.notes}</p>}
-                      </div>
-                      <div className="flex gap-4 text-xs font-semibold text-slate-300">
-                        {p.distance && <span>{p.distance} km</span>}
-                        {p.elevation && <span>{p.elevation} m D+</span>}
-                        <span className="text-slate-500">{p.date}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
