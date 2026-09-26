@@ -21,11 +21,8 @@ import {
   Apple,
   Trash2,
   Edit2,
-  Save,
-  FileCode2,
-  TrendingUp,
   MapPin,
-  Clock
+  UserPlus
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -64,8 +61,11 @@ export default function CoachDashboard() {
   // Utilizador Autenticado (Treinador)
   const [coachProfile, setCoachProfile] = useState<{ id: string; full_name?: string } | null>(null);
 
-  // Atletas Vinculados no Supabase
+  // Atletas Vinculados
   const [athletes, setAthletes] = useState<any[]>([]);
+  const [newAthleteName, setNewAthleteName] = useState('');
+  const [newAthleteEmail, setNewAthleteEmail] = useState('');
+  const [addingAthlete, setAddingAthlete] = useState(false);
 
   // Provas e Planos Criados
   const [races, setRaces] = useState<Race[]>([]);
@@ -122,7 +122,7 @@ export default function CoachDashboard() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select('*')
         .eq('coach_id', coachId)
         .eq('role', 'athlete');
 
@@ -134,6 +134,45 @@ export default function CoachDashboard() {
       }
     } catch (err) {
       console.error('Erro ao carregar atletas:', err);
+    }
+  };
+
+  const handleAddAthlete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAthleteName || !coachProfile) return;
+    setAddingAthlete(true);
+
+    try {
+      const athleteId = crypto.randomUUID();
+      const { error } = await supabase.from('profiles').insert([
+        {
+          id: athleteId,
+          full_name: newAthleteName,
+          email: newAthleteEmail || null,
+          role: 'athlete',
+          coach_id: coachProfile.id
+        }
+      ]);
+
+      if (error) throw error;
+
+      setNewAthleteName('');
+      setNewAthleteEmail('');
+      await loadAthletes(coachProfile.id);
+    } catch (err: any) {
+      alert('Erro ao adicionar atleta: ' + (err.message || 'Verifique se as permissões da tabela profiles permitem inserção.'));
+    } finally {
+      setAddingAthlete(false);
+    }
+  };
+
+  const handleDeleteAthlete = async (athleteId: string) => {
+    if (!confirm('Tem a certeza que deseja remover este atleta?')) return;
+    try {
+      await supabase.from('profiles').delete().eq('id', athleteId);
+      if (coachProfile) loadAthletes(coachProfile.id);
+    } catch (err) {
+      console.error('Erro ao remover atleta:', err);
     }
   };
 
@@ -166,7 +205,6 @@ export default function CoachDashboard() {
     setView('public');
   };
 
-  // Algoritmo de Criação do Plano de Prova (FC, Nutrição HC e Pacing)
   const generateRacePlanSectors = (
     dist: number,
     elev: number,
@@ -339,7 +377,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Insere ficheiros GPX, define a carga nutricional em gramas de hidratos de carbono (HC/h) e calcula o ritmo cardíaco ideal para os teus atletas.
+              Adiciona os teus atletas, insere ficheiros GPX, define a carga nutricional (HC/h) e calcula o ritmo cardíaco ideal para cada prova.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -362,7 +400,7 @@ export default function CoachDashboard() {
 
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold text-white">Login de Treinador</h2>
-                <p className="text-xs text-slate-400 mt-1">Insere as tuas credenciais do Supabase</p>
+                <p className="text-xs text-slate-400 mt-1">Insere as tuas credenciais</p>
               </div>
 
               {errorMessage && (
@@ -418,14 +456,72 @@ export default function CoachDashboard() {
         {/* PAINEL DO TREINADOR */}
         {view === 'coach' && coachProfile && (
           <div className="space-y-8">
-            <div className="border-b border-slate-800 pb-4">
-              <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-              <p className="text-xs text-slate-400">
-                Atletas Ativos no Supabase: <strong className="text-emerald-400">{athletes.length}</strong>
-              </p>
+            <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
+                <p className="text-xs text-slate-400">
+                  Gerencia atletas e gera estratégias de prova individualizadas.
+                </p>
+              </div>
             </div>
 
-            {/* FORMULÁRIO DE PROVA / GPX / NUTRIÇÃO / FC */}
+            {/* SECÇÃO 1: ADICIONAR E GERIR ATLETAS */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Users className="h-5 w-5 text-emerald-400" />
+                Os Meus Atletas ({athletes.length})
+              </h2>
+
+              {/* FORMULÁRIO RÁPIDO PARA ADICIONAR ATLETA */}
+              <form onSubmit={handleAddAthlete} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome do Atleta"
+                  value={newAthleteName}
+                  onChange={(e) => setNewAthleteName(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <input
+                  type="email"
+                  placeholder="Email do Atleta (Opcional)"
+                  value={newAthleteEmail}
+                  onChange={(e) => setNewAthleteEmail(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={addingAthlete}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  {addingAthlete ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                  Adicionar Atleta
+                </button>
+              </form>
+
+              {/* LISTA DE ATLETAS REGISTADOS */}
+              {athletes.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+                  {athletes.map((ath) => (
+                    <div key={ath.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-semibold text-white block">{ath.full_name}</span>
+                        {ath.email && <span className="text-xs text-slate-500">{ath.email}</span>}
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAthlete(ath.id)}
+                        className="p-1.5 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-lg transition-all"
+                        title="Remover Atleta"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SECÇÃO 2: FORMULÁRIO DE PROVA / GPX / NUTRIÇÃO / FC */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -476,11 +572,11 @@ export default function CoachDashboard() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     >
                       {athletes.length === 0 ? (
-                        <option value="">Sem atletas (Adicionar via Supabase)</option>
+                        <option value="">Adiciona primeiro um atleta acima</option>
                       ) : (
                         athletes.map((a) => (
                           <option key={a.id} value={a.id}>
-                            {a.full_name || 'Atleta sem Nome'}
+                            {a.full_name}
                           </option>
                         ))
                       )}
@@ -576,7 +672,7 @@ export default function CoachDashboard() {
               </form>
             </div>
 
-            {/* LISTA DE PROVAS CRIADAS */}
+            {/* SECÇÃO 3: LISTA DE PROVAS CRIADAS */}
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-emerald-400" /> Planos de Prova Ativos
@@ -584,7 +680,7 @@ export default function CoachDashboard() {
 
               {races.length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl text-center text-slate-500 text-xs">
-                  Nenhuma prova planeada. Preenche o formulário acima para gerar a estratégia.
+                  Nenhuma prova planeada. Adiciona um atleta acima e preenche o formulário para gerar a estratégia.
                 </div>
               ) : (
                 races.map((race) => {
