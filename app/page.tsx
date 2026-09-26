@@ -23,7 +23,7 @@ import {
   Calendar,
   Clock
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export default function LandingPage() {
   const [view, setView] = useState<'public' | 'login' | 'coach' | 'athlete'>('public');
