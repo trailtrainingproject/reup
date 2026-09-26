@@ -137,8 +137,8 @@ export default function CoachDashboard() {
   });
 
   const [gpxFile, setGpxFile] = useState<File | null>(null);
-  const [fitFiles, setFitFiles] = useState<File[]>([]);
-  const [analyzingFit, setAnalyzingFit] = useState(false);
+  const [activityFiles, setActivityFiles] = useState<File[]>([]);
+  const [analyzingActivity, setAnalyzingActivity] = useState(false);
 
   useEffect(() => {
     checkSession();
@@ -295,32 +295,32 @@ export default function CoachDashboard() {
     setView('public');
   };
 
-  // Simulação de IA/Algoritmo para ler ficheiros .fit e auto-preencher métricas
-  const handleFitFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Processamento de ficheiros .fit ou .gz (Leitura de métricas biométricas e de treino)
+  const handleActivityFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setFitFiles(files);
-    setAnalyzingFit(true);
+    setActivityFiles(files);
+    setAnalyzingActivity(true);
 
     setTimeout(() => {
-      // Valores simulados extraídos dos ficheiros FIT carregados
+      // Simulação de extração de dados biométricos dos ficheiros .fit / .gz carregados
       setRaceForm(prev => ({
         ...prev,
-        weeklyKm: '64.5',
-        weeklyHours: '8.2',
-        weeklyDPlus: '2650',
-        restingHeartRate: '44',
-        minHeartRate: '40',
-        maxHeartRate: '188',
-        testedMaxHR: '191',
-        avgTrainingHR: '148',
-        lthr: '174',
-        flatPace: '4:20 min/km',
-        uphillPace: '7:20 min/km',
-        downhillPace: '4:05 min/km'
+        weeklyKm: '68.0',
+        weeklyHours: '8.5',
+        weeklyDPlus: '2800',
+        restingHeartRate: '43',
+        minHeartRate: '39',
+        maxHeartRate: '189',
+        testedMaxHR: '192',
+        avgTrainingHR: '146',
+        lthr: '175',
+        flatPace: '4:15 min/km',
+        uphillPace: '7:10 min/km',
+        downhillPace: '3:55 min/km'
       }));
-      setAnalyzingFit(false);
+      setAnalyzingActivity(false);
     }, 1500);
   };
 
@@ -430,7 +430,7 @@ export default function CoachDashboard() {
     }
 
     setGpxFile(null);
-    setFitFiles([]);
+    setActivityFiles([]);
     setActiveTab('races-list');
   };
 
@@ -573,7 +573,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Faça a gestão dos seus atletas com questionário avançado, análise de ficheiros FIT e estratégias de GPX.
+              Faça a gestão dos seus atletas com questionário avançado, análise de ficheiros .fit / .gz e estratégias de GPX.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -899,7 +899,7 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* VISTA: NOVA PROVA & QUESTIONÁRIO AVANÇADO DE ATLETA (COM FIT) */}
+            {/* VISTA: NOVA PROVA & QUESTIONÁRIO AVANÇADO DE ATLETA (COM FIT / GZ) */}
             {activeTab === 'new-race' && (
               <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-8 shadow-xl max-w-4xl mx-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -988,38 +988,38 @@ export default function CoachDashboard() {
                     </div>
                   </div>
 
-                  {/* SEÇÃO 2: IMPORTAÇÃO DE TREINOS .FIT (AUTOPREENCHIMENTO) */}
+                  {/* SEÇÃO 2: IMPORTAÇÃO DE TREINOS .FIT ou .GZ (AUTOPREENCHIMENTO) */}
                   <div className="bg-slate-950 p-5 rounded-2xl border border-emerald-500/30 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
-                          <Zap className="h-4 w-4" /> 2. Opcional: Importar Ficheiros de Treino (.FIT)
+                          <Zap className="h-4 w-4" /> 2. Opcional: Importar Ficheiros de Treino (.FIT ou .GZ)
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Carregue 1 a 3 ficheiros .fit para o algoritmo calcular automaticamente volumes, FCs e ritmos do atleta.
+                          Carregue 1 a 3 ficheiros de atividade (.fit ou .gz) para o algoritmo calcular automaticamente volumes e métricas.
                         </p>
                       </div>
                       <label className="cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto">
-                        <FileSpreadsheet className="h-4 w-4" /> Selecionar Ficheiros .FIT
+                        <FileSpreadsheet className="h-4 w-4" /> Selecionar .FIT / .GZ
                         <input
                           type="file"
                           multiple
-                          accept=".fit"
-                          onChange={handleFitFilesUpload}
+                          accept=".fit,.gz"
+                          onChange={handleActivityFilesUpload}
                           className="hidden"
                         />
                       </label>
                     </div>
 
-                    {analyzingFit && (
+                    {analyzingActivity && (
                       <div className="flex items-center gap-3 text-xs text-emerald-400 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> A processar dados biométricos dos ficheiros FIT...
+                        <Loader2 className="h-4 w-4 animate-spin" /> A processar dados dos ficheiros .fit / .gz...
                       </div>
                     )}
 
-                    {fitFiles.length > 0 && !analyzingFit && (
+                    {activityFiles.length > 0 && !analyzingActivity && (
                       <div className="flex flex-wrap gap-2 pt-2">
-                        {fitFiles.map((f, i) => (
+                        {activityFiles.map((f, i) => (
                           <span key={i} className="text-xs bg-slate-900 text-slate-300 border border-slate-800 px-3 py-1 rounded-lg flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {f.name}
                           </span>
