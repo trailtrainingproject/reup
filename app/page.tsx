@@ -115,7 +115,6 @@ export default function CoachDashboard() {
   const [races, setRaces] = useState<Race[]>([]);
   const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
 
-  // Formulário completo de Prova (incluindo GPX, Fisiologia e Abastecimentos)
   const [raceForm, setRaceForm] = useState({
     name: '',
     date: new Date().toISOString().split('T')[0],
@@ -205,7 +204,7 @@ export default function CoachDashboard() {
 
     try {
       const athleteId = crypto.randomUUID();
-      const { error } = await supabase.from('profiles'].insert([
+      const { error } = await supabase.from('profiles').insert([
         {
           id: athleteId,
           name: newAthlete.name,
@@ -537,7 +536,6 @@ export default function CoachDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">
-      {/* Navbar Superior */}
       <nav className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md fixed top-0 w-full z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('public')}>
@@ -580,7 +578,6 @@ export default function CoachDashboard() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="pt-24 pb-16 px-4 max-w-7xl mx-auto print:p-0">
         {view === 'public' && (
           <div className="space-y-16 py-12 text-center max-w-3xl mx-auto">
@@ -644,7 +641,6 @@ export default function CoachDashboard() {
 
         {view === 'coach' && coachProfile && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Menu Lateral */}
             <div className="md:col-span-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2 h-fit print:hidden">
               <span className="text-[10px] uppercase tracking-widest text-slate-500 px-3 font-bold block mb-2">Menu Principal</span>
               
@@ -685,7 +681,6 @@ export default function CoachDashboard() {
               </button>
             </div>
 
-            {/* Conteúdo Central */}
             <div className="md:col-span-3 space-y-6">
               {activeTab === 'athletes-list' && (
                 <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
@@ -813,7 +808,6 @@ export default function CoachDashboard() {
                       </div>
                     </div>
 
-                    {/* Upload do Ficheiro GPX */}
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Ficheiro GPX do Percurso</label>
                       <input
@@ -824,7 +818,6 @@ export default function CoachDashboard() {
                       />
                     </div>
 
-                    {/* Importação .FIT / .GZ */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-3">
                       <div className="flex justify-between items-center">
                         <div>
@@ -839,7 +832,6 @@ export default function CoachDashboard() {
                       {analyzingActivity && <p className="text-xs text-emerald-400 animate-pulse">A analisar ficheiros...</p>}
                     </div>
 
-                    {/* Dados Fisiológicos Manuais / Automáticos */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                       <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Perfil Fisiológico & Ritmos</span>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -948,7 +940,6 @@ export default function CoachDashboard() {
                             </div>
                           </div>
 
-                          {/* Meteorologia Estimada */}
                           {race.weatherEstimate && (
                             <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center">
                               <div className="flex items-center gap-2.5">
@@ -964,7 +955,6 @@ export default function CoachDashboard() {
                             </div>
                           )}
 
-                          {/* Mapa de Postos de Abastecimento */}
                           <div className="space-y-3">
                             <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
                               <Flag className="h-4 w-4" /> Mapa de Postos de Abastecimento & Estratégia
@@ -986,7 +976,6 @@ export default function CoachDashboard() {
                             </div>
                           </div>
 
-                          {/* Carbo-Loading 3 Dias Antes */}
                           {race.preRaceNutrition && (
                             <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 space-y-3">
                               <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
