@@ -179,8 +179,10 @@ export default function CoachDashboard() {
     setAddingAthlete(true);
 
     try {
+      const athleteId = crypto.randomUUID();
       const { error } = await supabase.from('profiles').insert([
         {
+          id: athleteId,
           name: newAthlete.name,
           full_name: newAthlete.name,
           email: newAthlete.email || null,
