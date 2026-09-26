@@ -93,10 +93,10 @@ export default function LandingPage() {
 
       if (authData.user) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, role, full_name')
-          .eq('id', authData.user.id)
-          .single();
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+         .maybeSingle();
 
         if (profileError) throw profileError;
 
