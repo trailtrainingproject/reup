@@ -23,7 +23,10 @@ import {
   CheckCircle2,
   Flag,
   Sparkles,
-  Target
+  Target,
+  Trash2,
+  Edit2,
+  Save
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -64,6 +67,10 @@ export default function LandingPage() {
     { id: 'r2', name: 'UTMB Val d\'Aran', date: '2026-11-02', distance: 32, elevation: 2100 }
   ]);
   const [newRace, setNewRace] = useState({ name: '', date: '', distance: '', elevation: '' });
+
+  // Estado para edição de prova
+  const [editingRaceId, setEditingRaceId] = useState<string | null>(null);
+  const [editRaceData, setEditRaceData] = useState({ name: '', date: '', distance: '', elevation: '' });
 
   // Inscrição de Atletas em Provas + Objetivos
   const [raceRegistrations, setRaceRegistrations] = useState<any[]>([
@@ -173,8 +180,9 @@ export default function LandingPage() {
     e.preventDefault();
     if (!newRace.name || !newRace.distance) return;
 
+    const newId = String(Date.now());
     const race = {
-      id: String(Date.now()),
+      id: newId,
       name: newRace.name,
       date: newRace.date || new Date().toISOString().split('T')[0],
       distance: parseFloat(newRace.distance),
@@ -182,7 +190,42 @@ export default function LandingPage() {
     };
 
     setRaces([...races, race]);
+    setSelectedRaceForAthlete(newId);
     setNewRace({ name: '', date: '', distance: '', elevation: '' });
+  };
+
+  // Função para Apagar Prova
+  const handleDeleteRace = (raceId: string) => {
+    setRaces(races.filter(r => r.id !== raceId));
+    setRaceRegistrations(raceRegistrations.filter(reg => reg.raceId !== raceId));
+  };
+
+  // Iniciar Edição de Prova
+  const handleStartEditRace = (race: any) => {
+    setEditingRaceId(race.id);
+    setEditRaceData({
+      name: race.name,
+      date: race.date,
+      distance: String(race.distance),
+      elevation: String(race.elevation)
+    });
+  };
+
+  // Guardar Edição de Prova
+  const handleSaveEditRace = (raceId: string) => {
+    setRaces(races.map(r => {
+      if (r.id === raceId) {
+        return {
+          ...r,
+          name: editRaceData.name,
+          date: editRaceData.date,
+          distance: parseFloat(editRaceData.distance) || r.distance,
+          elevation: parseInt(editRaceData.elevation) || r.elevation
+        };
+      }
+      return r;
+    }));
+    setEditingRaceId(null);
   };
 
   const handleRegisterAthleteToRace = (e: React.FormEvent) => {
@@ -219,14 +262,13 @@ export default function LandingPage() {
     setPrescription({ title: '', distance: '', elevation: '', pace: '', notes: '' });
   };
 
-  // Função de Recomendação baseada no histórico
+  // Função de Recomendação de Performance
   const getPerformanceSuggestion = (athleteId: string, raceId: string) => {
     const athlete = athletes.find(a => a.id === athleteId);
     const race = races.find(r => r.id === raceId);
 
     if (!athlete || !race) return null;
 
-    // Métricas calculadas
     const kmRatio = athlete.totalKm / race.distance;
     const dPlusRatio = athlete.totalDPlus / (race.elevation || 1);
 
@@ -234,19 +276,19 @@ export default function LandingPage() {
       return {
         status: 'Excelente Preparação',
         color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-        text: `O atleta tem volume acumulado robusto (${athlete.totalKm}km / ${athlete.totalDPlus}m D+). Sugestão: Ritmo competitivo sustentado em Z3 nas subidas e ritmos fortes nos planos.`
+        text: `O atleta tem volume acumulado robusto (${athlete.totalKm}km / ${athlete.totalDPlus}m D+). Sugestão: Ritmo competitivo sustentado em Z3 nas subidas.`
       };
     } else if (kmRatio >= 1.5) {
       return {
         status: 'Preparação Moderada',
         color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-        text: `Volume de treinos razoável (${athlete.totalKm}km). Sugestão: Gestão conservadora no primeiro terço da prova. Foco estrito em gestão de nutrição (60g/h).`
+        text: `Volume de treinos razoável (${athlete.totalKm}km). Sugestão: Gestão conservadora no primeiro terço da prova. Foco estrito em nutrição.`
       };
     } else {
       return {
         status: 'Carga Reduzida (Risco de Fadiga)',
         color: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
-        text: `Histórico de treinos reduzido em relação à exigência da prova (${race.distance}km / ${race.elevation}m D+). Sugestão: Ritmo confortável em Z1/Z2 e caminhada ativa em subidas íngremes.`
+        text: `Histórico reduzido para a exigência da prova (${race.distance}km / ${race.elevation}m D+). Sugestão: Ritmo confortável em Z1/Z2.`
       };
     }
   };
@@ -523,17 +565,17 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* DASHBOARD DO TREINADOR AVANÇADO (PROVAS, OBJETIVOS & SUGESTÕES DE PERFORMANCE) */}
+        {/* DASHBOARD DO TREINADOR (COM EDITAR E APAGAR PROVAS) */}
         {view === 'coach' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white">Painel do Treinador</h1>
-                <p className="text-xs text-slate-400">Gestão de provas, colocação de atletas, objetivos e análise de performance</p>
+                <p className="text-xs text-slate-400">Gestão de provas, edição, eliminação e colocação de atletas</p>
               </div>
             </div>
 
-            {/* SECÇÃO 1: CRIAR PROVAS & INSCRICIÕS */}
+            {/* SECÇÃO 1: CRIAR PROVAS & INSCRIÇÕES */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* ADICIONAR PROVA */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
@@ -604,9 +646,13 @@ export default function LandingPage() {
                       onChange={(e) => setSelectedRaceForAthlete(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                     >
-                      {races.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name} ({r.distance}km / {r.elevation}m D+)</option>
-                      ))}
+                      {races.length === 0 ? (
+                        <option value="">Nenhuma prova disponível</option>
+                      ) : (
+                        races.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name} ({r.distance}km / {r.elevation}m D+)</option>
+                        ))
+                      )}
                     </select>
                   </div>
 
@@ -637,7 +683,8 @@ export default function LandingPage() {
 
                   <button
                     type="submit"
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                    disabled={races.length === 0}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
                   >
                     <Plus className="h-4 w-4" /> Confirmar Inscrição na Prova
                   </button>
@@ -645,81 +692,155 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* SECÇÃO 2: PAINEL DE PROVAS, ATLETAS INSCRITOS & RECOMENDAÇÕES INTELIGENTES DE PERFORMANCE */}
+            {/* SECÇÃO 2: PAINEL DE PROVAS (COM EDITAR E APAGAR) */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-emerald-400" /> Calendário de Provas & Sugestões de Performance
                 </h2>
                 <span className="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-400 font-medium">
-                  {races.length} Provas Ativas
+                  {races.length} Provas
                 </span>
               </div>
 
-              <div className="space-y-6">
-                {races.map((race) => {
-                  const regs = raceRegistrations.filter((reg) => reg.raceId === race.id);
+              {races.length === 0 ? (
+                <p className="text-xs text-slate-500 italic text-center py-4">Nenhuma prova registada. Cria uma nova prova acima!</p>
+              ) : (
+                <div className="space-y-6">
+                  {races.map((race) => {
+                    const regs = raceRegistrations.filter((reg) => reg.raceId === race.id);
+                    const isEditing = editingRaceId === race.id;
 
-                  return (
-                    <div key={race.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">PROVA PLANEADA</span>
-                          <h3 className="text-lg font-bold text-white">{race.name}</h3>
-                        </div>
-                        <div className="flex gap-3 text-xs font-semibold text-slate-300">
-                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.date}</span>
-                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.distance} km</span>
-                          <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.elevation} m D+</span>
-                        </div>
-                      </div>
-
-                      {/* LISTA DE ATLETAS DA PROVA */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-400 mb-3">Atletas Inscritos e Sugestões de Performance:</h4>
-                        {regs.length === 0 ? (
-                          <p className="text-xs text-slate-500 italic">Nenhum atleta associado a esta prova ainda.</p>
+                    return (
+                      <div key={race.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                        {isEditing ? (
+                          /* FORMULÁRIO DE EDIÇÃO DA PROVA */
+                          <div className="space-y-3 bg-slate-900/90 p-4 rounded-xl border border-emerald-500/30">
+                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Editar Detalhes da Prova</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={editRaceData.name}
+                                onChange={(e) => setEditRaceData({ ...editRaceData, name: e.target.value })}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                                placeholder="Nome da Prova"
+                              />
+                              <input
+                                type="date"
+                                value={editRaceData.date}
+                                onChange={(e) => setEditRaceData({ ...editRaceData, date: e.target.value })}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                              />
+                              <input
+                                type="number"
+                                value={editRaceData.distance}
+                                onChange={(e) => setEditRaceData({ ...editRaceData, distance: e.target.value })}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                                placeholder="Distância (km)"
+                              />
+                              <input
+                                type="number"
+                                value={editRaceData.elevation}
+                                onChange={(e) => setEditRaceData({ ...editRaceData, elevation: e.target.value })}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                                placeholder="Desnível (m D+)"
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end pt-2">
+                              <button
+                                onClick={() => setEditingRaceId(null)}
+                                className="px-3 py-1 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 rounded-lg"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => handleSaveEditRace(race.id)}
+                                className="px-3 py-1 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg flex items-center gap-1"
+                              >
+                                <Save className="h-3.5 w-3.5" /> Guardar
+                              </button>
+                            </div>
+                          </div>
                         ) : (
-                          <div className="space-y-3">
-                            {regs.map((reg) => {
-                              const athlete = athletes.find((a) => a.id === reg.athleteId);
-                              const suggestion = getPerformanceSuggestion(reg.athleteId, race.id);
-
-                              return (
-                                <div key={reg.id} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <Users className="h-4 w-4 text-emerald-400" />
-                                      <span className="font-bold text-sm text-white">{athlete?.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-slate-400">Objetivo:</span>
-                                      <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                        {reg.target}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Caixa de Recomendação de Performance */}
-                                  {suggestion && (
-                                    <div className={`p-3 rounded-lg border text-xs space-y-1 ${suggestion.color}`}>
-                                      <div className="font-bold flex items-center gap-1.5">
-                                        <Sparkles className="h-3.5 w-3.5" />
-                                        <span>Análise da Plataforma: {suggestion.status}</span>
-                                      </div>
-                                      <p className="text-slate-300 leading-relaxed">{suggestion.text}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                          /* CABEÇALHO DA PROVA COM BOTÕES DE EDITAR/APAGAR */
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">PROVA PLANEADA</span>
+                              <h3 className="text-lg font-bold text-white">{race.name}</h3>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex gap-2 text-xs font-semibold text-slate-300">
+                                <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.date}</span>
+                                <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.distance} km</span>
+                                <span className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">{race.elevation} m D+</span>
+                              </div>
+                              <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
+                                <button
+                                  onClick={() => handleStartEditRace(race)}
+                                  className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-900 rounded-lg transition-all"
+                                  title="Editar Prova"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRace(race.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-all"
+                                  title="Apagar Prova"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
+
+                        {/* LISTA DE ATLETAS DA PROVA */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 mb-3">Atletas Inscritos e Sugestões de Performance:</h4>
+                          {regs.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic">Nenhum atleta associado a esta prova ainda.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {regs.map((reg) => {
+                                const athlete = athletes.find((a) => a.id === reg.athleteId);
+                                const suggestion = getPerformanceSuggestion(reg.athleteId, race.id);
+
+                                return (
+                                  <div key={reg.id} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-emerald-400" />
+                                        <span className="font-bold text-sm text-white">{athlete?.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-400">Objetivo:</span>
+                                        <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                          {reg.target}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Caixa de Recomendação de Performance */}
+                                    {suggestion && (
+                                      <div className={`p-3 rounded-lg border text-xs space-y-1 ${suggestion.color}`}>
+                                        <div className="font-bold flex items-center gap-1.5">
+                                          <Sparkles className="h-3.5 w-3.5" />
+                                          <span>Análise da Plataforma: {suggestion.status}</span>
+                                        </div>
+                                        <p className="text-slate-300 leading-relaxed">{suggestion.text}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* SECÇÃO 3: PRESCRIÇÃO RÁPIDA DE TREINOS */}
