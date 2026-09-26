@@ -339,7 +339,7 @@ export default function CoachDashboard() {
               Planos de Prova, Nutrição e Ritmos Cardíacos
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Insere ficheiros GPX, define a carga nutricional em gramas de hidratos de carbono ($HC/h$) e calcula o ritmo cardíaco ideal para os teus atletas.
+              Insere ficheiros GPX, define a carga nutricional em gramas de hidratos de carbono (HC/h) e calcula o ritmo cardíaco ideal para os teus atletas.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -529,7 +529,7 @@ export default function CoachDashboard() {
 
                   <div>
                     <label className="block text-xs text-red-400 font-semibold mb-1 flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5" /> Frequência Cardíaca Máx ($FC_{máx}$)
+                      <Heart className="h-3.5 w-3.5" /> Frequência Cardíaca Máxima (FC Máx)
                     </label>
                     <input
                       type="number"
@@ -543,7 +543,7 @@ export default function CoachDashboard() {
 
                   <div>
                     <label className="block text-xs text-slate-400 font-semibold mb-1 flex items-center gap-1">
-                      <Activity className="h-3.5 w-3.5" /> FC em Repouso ($FC_{rep}$)
+                      <Activity className="h-3.5 w-3.5" /> FC em Repouso (FC Rep)
                     </label>
                     <input
                       type="number"
@@ -616,7 +616,7 @@ export default function CoachDashboard() {
                             <Edit2 className="h-3.5 w-3.5" /> Editar
                           </button>
                           <button
-                            onClick={() => handleDeleteRace(race)}
+                            onClick={() => handleDeleteRace(race.id)}
                             className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs flex items-center gap-1 transition-all"
                           >
                             <Trash2 className="h-3.5 w-3.5" /> Eliminar
@@ -639,11 +639,11 @@ export default function CoachDashboard() {
                                 <span className="text-slate-200">{sec.terrain}</span>
                               </div>
                               <div>
-                                <span className="text-slate-500 block">Ritmo Cardiaco Recomendado</span>
+                                <span className="text-slate-500 block">Ritmo Cardíaco Recomendado</span>
                                 <span className="text-red-400 font-medium">{sec.heartRateZone}</span>
                               </div>
                               <div>
-                                <span className="text-slate-500 block">Estratégia Nutricional ($HC/h$)</span>
+                                <span className="text-slate-500 block">Estratégia Nutricional (HC/h)</span>
                                 <span className="text-emerald-400 font-medium">{sec.carbsTarget} ({sec.hydration})</span>
                               </div>
                               <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 mt-2">
