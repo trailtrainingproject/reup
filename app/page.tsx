@@ -25,6 +25,7 @@ import {
   User,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
   FileSpreadsheet,
   CheckCircle2,
   Zap,
@@ -100,6 +101,12 @@ export default function CoachDashboard() {
   const [athletes, setAthletes] = useState<any[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [addingAthlete, setAddingAthlete] = useState(false);
+
+  // Filtro de Atleta no Histórico Geral de Provas
+  const [filterAthleteId, setFilterAthleteId] = useState<string>('all');
+  
+  // IDs de provas expandidas no perfil do atleta ou lista
+  const [expandedRaceIds, setExpandedRaceIds] = useState<{ [key: string]: boolean }>({});
 
   const [newAthlete, setNewAthlete] = useState({
     name: '',
@@ -189,7 +196,6 @@ export default function CoachDashboard() {
 
       if (!error && data) {
         setAthletes(data);
-        // Se houver atletas e o formulário ainda não tiver um atleta atribuído, seleciona o primeiro por defeito
         if (data.length > 0 && !raceForm.athleteId) {
           setRaceForm((prev) => ({ ...prev, athleteId: data[0].id }));
         }
@@ -453,7 +459,6 @@ export default function CoachDashboard() {
     e.preventDefault();
     if (!raceForm.name || !raceForm.distance) return;
 
-    // Validação de segurança: se não houver atleta selecionado, força o primeiro da lista se existir
     let targetAthleteId = raceForm.athleteId;
     if (!targetAthleteId && athletes.length > 0) {
       targetAthleteId = athletes[0].id;
@@ -497,7 +502,7 @@ export default function CoachDashboard() {
         location: raceForm.location,
         distance: dist,
         elevation: elev,
-        athleteId: targetAthleteId, // Garantir atualização correta
+        athleteId: targetAthleteId,
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
@@ -516,7 +521,7 @@ export default function CoachDashboard() {
         location: raceForm.location,
         distance: dist,
         elevation: elev,
-        athleteId: targetAthleteId, // Garantir atribuição correta
+        athleteId: targetAthleteId,
         targetCarbsPerHour: carbs,
         maxHeartRate: maxHR,
         restingHeartRate: restHR,
@@ -554,6 +559,14 @@ export default function CoachDashboard() {
   const handleDeleteRace = (id: string) => {
     setRaces(races.filter(r => r.id !== id));
   };
+
+  const toggleRaceExpand = (raceId: string) => {
+    setExpandedRaceIds(prev => ({ ...prev, [raceId]: !prev[raceId] }));
+  };
+
+  const filteredRaces = filterAthleteId === 'all' 
+    ? races 
+    : races.filter(r => r.athleteId === filterAthleteId);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">
@@ -738,55 +751,148 @@ export default function CoachDashboard() {
 
             <div className="md:col-span-3 space-y-6">
               {activeTab === 'athlete-profile' && selectedAthlete ? (
-                <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
-                  <button
-                    onClick={() => setActiveTab('athletes-list')}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2 print:hidden"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Voltar à lista de atletas
-                  </button>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                    <div>
-                      <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil Individual</span>
-                      <h1 className="text-2xl sm:text-3xl font-black text-white">{selectedAthlete.full_name || selectedAthlete.name}</h1>
-                    </div>
+                <div className="space-y-6">
+                  <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 shadow-xl">
                     <button
-                      onClick={() => handleDeleteAthlete(selectedAthlete.id)}
-                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto print:hidden"
+                      onClick={() => setActiveTab('athletes-list')}
+                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 mb-2 print:hidden"
                     >
-                      <Trash2 className="h-4 w-4" /> Eliminar Atleta
+                      <ArrowLeft className="h-4 w-4" /> Voltar à lista de atletas
                     </button>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div>
+                        <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold block mb-1">Perfil Individual</span>
+                        <h1 className="text-2xl sm:text-3xl font-black text-white">{selectedAthlete.full_name || selectedAthlete.name}</h1>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAthlete(selectedAthlete.id)}
+                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all self-start sm:self-auto print:hidden"
+                      >
+                        <Trash2 className="h-4 w-4" /> Eliminar Atleta
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                        <span className="text-xs text-slate-500 block mb-1">Contacto Telefónico</span>
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-emerald-400" /> {selectedAthlete.phone || 'Não definido'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                        <span className="text-xs text-slate-500 block mb-1">Email</span>
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-emerald-400" /> {selectedAthlete.email || 'Não definido'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                        <span className="text-xs text-slate-500 block mb-1">Idade & Género</span>
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                          <User className="h-4 w-4 text-emerald-400" /> {selectedAthlete.age ? `${selectedAthlete.age} anos` : '-'} ({selectedAthlete.gender || '-'})
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                        <span className="text-xs text-slate-500 block mb-1">Peso Atual</span>
+                        <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+                          <Scale className="h-4 w-4" /> {selectedAthlete.weight ? `${selectedAthlete.weight} kg` : 'Não definido'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Contacto Telefónico</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-emerald-400" /> {selectedAthlete.phone || 'Não definido'}
-                      </span>
-                    </div>
+                  {/* Planos de Prova Associados a Este Atleta */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-emerald-400" /> Planos de Prova Deste Atleta ({races.filter(r => r.athleteId === selectedAthlete.id).length})
+                    </h3>
 
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Email</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-emerald-400" /> {selectedAthlete.email || 'Não definido'}
-                      </span>
-                    </div>
+                    {races.filter(r => r.athleteId === selectedAthlete.id).length === 0 ? (
+                      <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl text-center text-slate-500 text-xs">
+                        Este atleta ainda não tem nenhum plano de prova associado.
+                      </div>
+                    ) : (
+                      races.filter(r => r.athleteId === selectedAthlete.id).map((race) => {
+                        const isExpanded = expandedRaceIds[race.id];
 
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Idade & Género</span>
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <User className="h-4 w-4 text-emerald-400" /> {selectedAthlete.age ? `${selectedAthlete.age} anos` : '-'} ({selectedAthlete.gender || '-'})
-                      </span>
-                    </div>
+                        return (
+                          <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer" onClick={() => toggleRaceExpand(race.id)}>
+                              <div>
+                                <div className="flex items-center gap-3">
+                                  <h4 className="text-xl font-black text-white">{race.name}</h4>
+                                  <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> {race.location} ({race.date})
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {race.distance} km • {race.elevation}m D+ • <strong className="text-emerald-400">{race.targetCarbsPerHour}g HC/h</strong>
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 print:hidden">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleEditRace(race); }}
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" /> Editar
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteRace(race.id); }}
+                                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs flex items-center gap-1"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                                </button>
+                                <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 ml-2">
+                                  {isExpanded ? 'Ocultar Detalhes' : 'Abrir Plano'} <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </span>
+                              </div>
+                            </div>
 
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-                      <span className="text-xs text-slate-500 block mb-1">Peso Atual</span>
-                      <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
-                        <Scale className="h-4 w-4" /> {selectedAthlete.weight ? `${selectedAthlete.weight} kg` : 'Não definido'}
-                      </span>
-                    </div>
+                            {/* Detalhes expandidos do plano no perfil */}
+                            {isExpanded && (
+                              <div className="space-y-4 pt-4 border-t border-slate-800 animate-fadeIn">
+                                {race.weatherEstimate && (
+                                  <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <CloudSun className="h-5 w-5 text-blue-400" />
+                                      <span className="text-slate-300">Meteorologia: <strong>{race.weatherEstimate.condition}</strong> ({race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax})</span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {race.preRaceNutrition && (
+                                  <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-2 text-xs">
+                                    <strong className="text-emerald-400 flex items-center gap-1.5">
+                                      <Apple className="h-4 w-4" /> Carbo-Loading (3 Dias Antes)
+                                    </strong>
+                                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[11px] text-slate-300">
+                                      <div className="bg-slate-900 p-2 rounded border border-slate-800"><strong>-3 Dias:</strong> {race.preRaceNutrition.dayMinus3}</div>
+                                      <div className="bg-slate-900 p-2 rounded border border-slate-800"><strong>-2 Dias:</strong> {race.preRaceNutrition.dayMinus2}</div>
+                                      <div className="bg-slate-900 p-2 rounded border border-slate-800"><strong>Véspera:</strong> {race.preRaceNutrition.dayMinus1}</div>
+                                      <div className="bg-slate-900 p-2 rounded border border-slate-800"><strong>Manhã:</strong> {race.preRaceNutrition.raceMorning}</div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  {race.planSectors.map((sec, idx) => (
+                                    <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                                      <strong className="text-emerald-400 block">{sec.sector}</strong>
+                                      <span className="text-slate-300 block">{sec.distanceKm}</span>
+                                      <p className="text-slate-400 text-[11px] pt-1"><strong>Terreno:</strong> {sec.terrain}</p>
+                                      <p className="text-red-400 text-[11px]"><strong>FC:</strong> {sec.heartRateZone}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -1254,41 +1360,56 @@ export default function CoachDashboard() {
 
               {activeTab === 'races-list' && (
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 print:hidden">
+                  {/* Cabeçalho & Filtro de Atleta no Histórico */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:hidden">
                     <div>
                       <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Relatório & Histórico</span>
-                      <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({races.length})</h2>
+                      <h2 className="text-xl font-bold text-white">Planos de Prova Ativos ({filteredRaces.length})</h2>
                     </div>
-                    <div className="flex items-center gap-2">
+                    
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Filtro por Atleta */}
+                      <select
+                        value={filterAthleteId}
+                        onChange={(e) => setFilterAthleteId(e.target.value)}
+                        className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="all">Filtrar por Atleta: Todos</option>
+                        {athletes.map(a => (
+                          <option key={a.id} value={a.id}>{a.full_name || a.name}</option>
+                        ))}
+                      </select>
+
                       <button
                         onClick={() => window.print()}
-                        className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                        className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
                       >
-                        <Printer className="h-3.5 w-3.5" /> Imprimir / Exportar PDF
+                        <Printer className="h-3.5 w-3.5" /> PDF
                       </button>
                       <button
                         onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
                       >
                         <Sparkles className="h-3.5 w-3.5" /> Nova Prova
                       </button>
                     </div>
                   </div>
 
-                  {races.length === 0 ? (
+                  {filteredRaces.length === 0 ? (
                     <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                      Nenhuma prova planeada. Crie uma nova prova no menu lateral.
+                      Nenhuma prova encontrada para o filtro selecionado.
                     </div>
                   ) : (
-                    races.map((race) => {
+                    filteredRaces.map((race) => {
                       const assignedAthlete = athletes.find((a) => a.id === race.athleteId);
+                      const isExpanded = expandedRaceIds[race.id];
 
                       return (
                         <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black print:border-none print:shadow-none">
                           
                           {/* Cabeçalho do Relatório */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:border-slate-300">
-                            <div>
+                            <div className="cursor-pointer flex-1" onClick={() => toggleRaceExpand(race.id)}>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-2xl font-black text-white print:text-slate-900">{race.name}</h3>
                                 <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full print:border-emerald-600 print:text-emerald-700">
@@ -1305,10 +1426,10 @@ export default function CoachDashboard() {
 
                             <div className="flex items-center gap-2 print:hidden">
                               <button
-                                onClick={() => window.print()}
-                                className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1 transition-all"
+                                onClick={() => toggleRaceExpand(race.id)}
+                                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1 transition-all"
                               >
-                                <Printer className="h-3.5 w-3.5" /> PDF
+                                {isExpanded ? 'Ocultar Plano' : 'Abrir Plano'} <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </button>
                               <button
                                 onClick={() => handleEditRace(race)}
@@ -1325,101 +1446,106 @@ export default function CoachDashboard() {
                             </div>
                           </div>
 
-                          {/* Bloco de Meteorologia Estimada */}
-                          {race.weatherEstimate && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 print:border-slate-300 print:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                              <div className="flex items-center gap-2.5">
-                                <CloudSun className="h-6 w-6 text-blue-400" />
-                                <div>
-                                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block">Previsão Meteorológica em {race.location}</span>
-                                  <span className="text-xs text-slate-300 print:text-slate-700">Condição: <strong>{race.weatherEstimate.condition}</strong> • Vento: {race.weatherEstimate.wind} • Humidade: {race.weatherEstimate.humidity}</span>
+                          {/* O plano completo só aparece perfeitamente detalhado ao abrir o plano ou na impressão */}
+                          {(isExpanded || window.matchMedia('print').matches) && (
+                            <div className="space-y-6 animate-fadeIn">
+                              {/* Bloco de Meteorologia Estimada */}
+                              {race.weatherEstimate && (
+                                <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 print:border-slate-300 print:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <CloudSun className="h-6 w-6 text-blue-400" />
+                                    <div>
+                                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block">Previsão Meteorológica em {race.location}</span>
+                                      <span className="text-xs text-slate-300 print:text-slate-700">Condição: <strong>{race.weatherEstimate.condition}</strong> • Vento: {race.weatherEstimate.wind} • Humidade: {race.weatherEstimate.humidity}</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-3 py-1.5 rounded-lg print:bg-white print:border-slate-300">
+                                    Temperaturas: <strong>{race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax}</strong>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-3 py-1.5 rounded-lg print:bg-white print:border-slate-300">
-                                Temperaturas: <strong>{race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax}</strong>
+                              )}
+
+                              {/* Bloco de Métricas do Atleta */}
+                              {race.athleteMetrics && (
+                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs print:bg-slate-50 print:border-slate-300">
+                                  <div>
+                                    <span className="text-slate-500 print:text-slate-600 block">Volume Semanal</span>
+                                    <span className="text-white print:text-black font-medium">{race.athleteMetrics.weeklyKm} km | {race.athleteMetrics.weeklyHours}h</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500 print:text-slate-600 block">Limiar (LTHR)</span>
+                                    <span className="text-red-400 font-medium">{race.athleteMetrics.lthr} bpm</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500 print:text-slate-600 block">Ritmo Plano</span>
+                                    <span className="text-emerald-400 font-medium">{race.athleteMetrics.flatPace}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500 print:text-slate-600 block">Ritmo Subida</span>
+                                    <span className="text-emerald-400 font-medium">{race.athleteMetrics.uphillPace}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Guia Nutricional de Pré-Prova (Carbo-Loading 3 Dias Antes) */}
+                              {race.preRaceNutrition && (
+                                <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 print:border-slate-300 print:bg-slate-50 space-y-3">
+                                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
+                                    <Apple className="h-4 w-4" /> Plano Nutricional de Pré-Prova (Carbo-Loading - 3 Dias Antes)
+                                  </h4>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                      <strong className="text-emerald-400 block mb-1">3 Dias Antes (-3)</strong>
+                                      <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus3}</span>
+                                    </div>
+                                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                      <strong className="text-emerald-400 block mb-1">2 Dias Antes (-2)</strong>
+                                      <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus2}</span>
+                                    </div>
+                                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                      <strong className="text-emerald-400 block mb-1">Véspera (-1)</strong>
+                                      <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus1}</span>
+                                    </div>
+                                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
+                                      <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
+                                      <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.raceMorning}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Setores Estratégicos da Prova */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {race.planSectors.map((sec, idx) => (
+                                  <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 print:bg-slate-50 print:border-slate-300">
+                                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
+                                      {sec.sector}
+                                    </span>
+                                    <div className="text-xs text-slate-300 print:text-slate-800 font-medium">{sec.distanceKm}</div>
+
+                                    <div className="space-y-2 pt-2 border-t border-slate-900 print:border-slate-200 text-xs">
+                                      <div>
+                                        <span className="text-slate-500 print:text-slate-600 block">Terreno & Pacing</span>
+                                        <span className="text-slate-200 print:text-slate-900">{sec.terrain}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500 print:text-slate-600 block">Ritmo Cardíaco Recomendado</span>
+                                        <span className="text-red-400 font-medium">{sec.heartRateZone}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500 print:text-slate-600 block">Estratégia Nutricional (HC/h)</span>
+                                        <span className="text-emerald-400 font-medium">{sec.carbsTarget} ({sec.hydration})</span>
+                                      </div>
+                                      <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 print:bg-white print:border-slate-200 text-[11px] text-slate-400 print:text-slate-700 mt-2">
+                                        <Apple className="h-3 w-3 text-emerald-400 inline mr-1" />
+                                        {sec.nutritionTips}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )}
-
-                          {/* Bloco de Métricas do Atleta */}
-                          {race.athleteMetrics && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs print:bg-slate-50 print:border-slate-300">
-                              <div>
-                                <span className="text-slate-500 print:text-slate-600 block">Volume Semanal</span>
-                                <span className="text-white print:text-black font-medium">{race.athleteMetrics.weeklyKm} km | {race.athleteMetrics.weeklyHours}h</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 print:text-slate-600 block">Limiar (LTHR)</span>
-                                <span className="text-red-400 font-medium">{race.athleteMetrics.lthr} bpm</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 print:text-slate-600 block">Ritmo Plano</span>
-                                <span className="text-emerald-400 font-medium">{race.athleteMetrics.flatPace}</span>
-                              </div>
-                              <div>
-                                <span className="text-slate-500 print:text-slate-600 block">Ritmo Subida</span>
-                                <span className="text-emerald-400 font-medium">{race.athleteMetrics.uphillPace}</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Guia Nutricional de Pré-Prova (Carbo-Loading 3 Dias Antes) */}
-                          {race.preRaceNutrition && (
-                            <div className="bg-slate-950 p-5 rounded-xl border border-emerald-500/30 print:border-slate-300 print:bg-slate-50 space-y-3">
-                              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
-                                <Apple className="h-4 w-4" /> Plano Nutricional de Pré-Prova (Carbo-Loading - 3 Dias Antes)
-                              </h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                                  <strong className="text-emerald-400 block mb-1">3 Dias Antes (-3)</strong>
-                                  <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus3}</span>
-                                </div>
-                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                                  <strong className="text-emerald-400 block mb-1">2 Dias Antes (-2)</strong>
-                                  <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus2}</span>
-                                </div>
-                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                                  <strong className="text-emerald-400 block mb-1">Véspera (-1)</strong>
-                                  <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.dayMinus1}</span>
-                                </div>
-                                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                                  <strong className="text-emerald-400 block mb-1">Manhã da Prova</strong>
-                                  <span className="text-slate-300 print:text-slate-700">{race.preRaceNutrition.raceMorning}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Setores Estratégicos da Prova */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {race.planSectors.map((sec, idx) => (
-                              <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 print:bg-slate-50 print:border-slate-300">
-                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
-                                  {sec.sector}
-                                </span>
-                                <div className="text-xs text-slate-300 print:text-slate-800 font-medium">{sec.distanceKm}</div>
-
-                                <div className="space-y-2 pt-2 border-t border-slate-900 print:border-slate-200 text-xs">
-                                  <div>
-                                    <span className="text-slate-500 print:text-slate-600 block">Terreno & Pacing</span>
-                                    <span className="text-slate-200 print:text-slate-900">{sec.terrain}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-500 print:text-slate-600 block">Ritmo Cardíaco Recomendado</span>
-                                    <span className="text-red-400 font-medium">{sec.heartRateZone}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-500 print:text-slate-600 block">Estratégia Nutricional (HC/h)</span>
-                                    <span className="text-emerald-400 font-medium">{sec.carbsTarget} ({sec.hydration})</span>
-                                  </div>
-                                  <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 print:bg-white print:border-slate-200 text-[11px] text-slate-400 print:text-slate-700 mt-2">
-                                    <Apple className="h-3 w-3 text-emerald-400 inline mr-1" />
-                                    {sec.nutritionTips}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
                         </div>
                       );
                     })
