@@ -1,18 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Garante que a URL é uma string limpa e sem barras no final
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const cleanUrl = rawUrl.trim().replace(/\/+$/, '');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/+$/, '');
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const cleanKey = rawKey.trim();
+// Garante que a URL é válida para não interromper a pré-renderização (SSG) no build da Vercel
+const validUrl = supabaseUrl && supabaseUrl.startsWith('https://') 
+  ? supabaseUrl 
+  : 'https://placeholder.supabase.co';
 
-// Validação preventiva para evitar erros de rota no cliente
-if (!cleanUrl.startsWith('https://')) {
-  console.error('URL do Supabase inválida:', cleanUrl);
-}
+const validKey = supabaseAnonKey || 'placeholder-key';
 
-export const supabase = createClient(
-  cleanUrl || 'https://placeholder.supabase.co',
-  cleanKey || 'placeholder'
-);
+export const supabase = createClient(validUrl, validKey);
