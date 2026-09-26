@@ -582,7 +582,7 @@ export default function CoachDashboard() {
         {view === 'coach' && coachProfile && (
           <div className="space-y-8">
 
-            {/* BOTÕES DE ATALHO RÁPIDO PARA MOBILE (caso o menu drop seja oculto em ecrãs pequenos) */}
+            {/* BOTÕES DE ATALHO RÁPIDO PARA MOBILE */}
             <div className="flex md:hidden gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
               <button
                 onClick={() => { setActiveTab('athletes-list'); setSelectedAthlete(null); }}
@@ -695,7 +695,7 @@ export default function CoachDashboard() {
 
                 {athletes.length === 0 ? (
                   <div className="p-12 text-center text-slate-500 text-xs italic">
-                    Ainda não tem atletas registados. Selecione "Atletas > Registar Novo Atleta" no menu superior.
+                    Ainda não tem atletas registados. Selecione Atletas &gt; Registar Novo Atleta no menu superior.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -982,7 +982,7 @@ export default function CoachDashboard() {
 
                 {races.length === 0 ? (
                   <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-500 text-xs">
-                    Nenhuma prova planeada. Selecione "Provas > Criar Nova Prova & GPX" no menu superior.
+                    Nenhuma prova planeada. Selecione "Provas &gt; Criar Nova Prova &amp; GPX" no menu superior.
                   </div>
                 ) : (
                   races.map((race) => {
