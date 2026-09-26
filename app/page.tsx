@@ -105,7 +105,6 @@ export default function CoachDashboard() {
   const [filterAthleteId, setFilterAthleteId] = useState<string>('all');
   const [expandedRaceIds, setExpandedRaceIds] = useState<{ [key: string]: boolean }>({});
 
-  // Formulário de Atleta expandido com métricas e campos adicionais para o Supabase
   const [newAthlete, setNewAthlete] = useState({
     name: '',
     email: '',
@@ -221,7 +220,6 @@ export default function CoachDashboard() {
     setNewAthlete((prev) => ({ ...prev, birthDate: dateString, age: calculatedAge }));
   };
 
-  // ADICIONAR ATLETA DIRETAMENTE NO SUPABASE
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAthlete.name || !coachProfile) return;
@@ -265,13 +263,12 @@ export default function CoachDashboard() {
       await loadAthletes(coachProfile.id);
       setActiveTab('athletes-list');
     } catch (err: any) {
-      alert('Erro ao guardar atleta no Supabase: ' + (err.message || 'Verifique as políticas RLS ou colunas da tabela profiles.'));
+      alert('Erro ao guardar atleta no Supabase: ' + (err.message || 'Verifique as políticas RLS.'));
     } finally {
       setAddingAthlete(false);
     }
   };
 
-  // ELIMINAR ATLETA DO SUPABASE
   const handleDeleteAthlete = async (athleteId: string) => {
     if (!confirm('Tem a certeza que deseja remover este atleta do Supabase?')) return;
     try {
@@ -582,6 +579,25 @@ export default function CoachDashboard() {
     setExpandedRaceIds(prev => ({ ...prev, [raceId]: !prev[raceId] }));
   };
 
+  // Função para imprimir/exportar o PDF apenas de um plano específico isolado
+  const printSingleRace = (raceId: string) => {
+    setExpandedRaceIds(prev => ({ ...prev, [raceId]: true }));
+    setTimeout(() => {
+      const printContents = document.getElementById(`race-card-${raceId}`)?.innerHTML;
+      if (!printContents) return;
+
+      const originalContents = document.body.innerHTML;
+      document.body.innerHTML = `
+        <div style="font-family: sans-serif; padding: 20px; color: black; background: white;">
+          ${printContents}
+        </div>
+      `;
+      window.print();
+      document.body.innerHTML = originalContents;
+      window.location.reload();
+    }, 100);
+  };
+
   const filteredRaces = filterAthleteId === 'all' 
     ? races 
     : races.filter(r => r.athleteId === filterAthleteId);
@@ -602,12 +618,6 @@ export default function CoachDashboard() {
           <div className="flex items-center gap-4">
             {coachProfile ? (
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-all shadow"
-                >
-                  <Printer className="h-3.5 w-3.5" /> Exportar PDF
-                </button>
                 <span className="text-xs text-slate-400 hidden sm:inline">
                   Treinador: <strong className="text-slate-200">{coachProfile.full_name || 'Treinador'}</strong>
                 </span>
@@ -836,7 +846,7 @@ export default function CoachDashboard() {
                         const isExpanded = expandedRaceIds[race.id];
 
                         return (
-                          <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+                          <div key={race.id} id={`race-card-${race.id}`} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer" onClick={() => toggleRaceExpand(race.id)}>
                               <div>
                                 <div className="flex items-center gap-3">
@@ -850,6 +860,12 @@ export default function CoachDashboard() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2 print:hidden">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); printSingleRace(race.id); }}
+                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1"
+                                >
+                                  <Printer className="h-3.5 w-3.5" /> PDF
+                                </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleEditRace(race); }}
                                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1"
@@ -1395,12 +1411,6 @@ export default function CoachDashboard() {
                       </select>
 
                       <button
-                        onClick={() => window.print()}
-                        className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> PDF
-                      </button>
-                      <button
                         onClick={() => { setEditingRaceId(null); setActiveTab('new-race'); }}
                         className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
                       >
@@ -1419,7 +1429,7 @@ export default function CoachDashboard() {
                       const isExpanded = expandedRaceIds[race.id];
 
                       return (
-                        <div key={race.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black print:border-none print:shadow-none">
+                        <div key={race.id} id={`race-card-${race.id}`} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl print:bg-white print:text-black print:border-none print:shadow-none">
                           
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 print:border-slate-300">
                             <div className="cursor-pointer flex-1" onClick={() => toggleRaceExpand(race.id)}>
@@ -1439,22 +1449,28 @@ export default function CoachDashboard() {
 
                             <div className="flex items-center gap-2 print:hidden">
                               <button
-                                onClick={() => toggleRaceExpand(race.id)}
-                                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1 transition-all"
+                                onClick={() => printSingleRace(race.id)}
+                                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs flex items-center gap-1 transition-all shadow"
                               >
-                                {isExpanded ? 'Ocultar Plano' : 'Abrir Plano'} <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                <Printer className="h-3.5 w-3.5" /> PDF do Plano
+                              </button>
+                              <button
+                                onClick={() => toggleRaceExpand(race.id)}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-all"
+                              >
+                                {isExpanded ? 'Ocultar' : 'Abrir'} <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </button>
                               <button
                                 onClick={() => handleEditRace(race)}
                                 className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-all"
                               >
-                                <Edit2 className="h-3.5 w-3.5" /> Editar
+                                <Edit2 className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteRace(race.id)}
                                 className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs flex items-center gap-1 transition-all"
                               >
-                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </div>
