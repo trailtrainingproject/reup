@@ -1,3 +1,4 @@
+// @ts-ignore
 import gpxParser from 'gpxparser';
 
 export interface RaceAnalysis {
