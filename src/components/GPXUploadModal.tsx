@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { analyzeGPX, RaceAnalysis } from '@/lib/gpx-analyzer';
+import { analyzeGPX, RaceAnalysis } from '../lib/gpx-analyzer';
 import { Mountain, Upload, Activity, Clock, Flame } from 'lucide-react';
 
 interface GPXUploadProps {
