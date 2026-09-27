@@ -87,9 +87,10 @@ interface Race {
   };
   planSectors: RacePlanSector[];
 }
+
+// Função para obter meteorologia real com base na localidade e na data
 async function fetchWeatherEstimate(location: string, date: string) {
   try {
-    // 1. Obter coordenadas (latitude e longitude) da localidade através da API pública de geocodificação
     const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=pt&format=json`);
     const geoData = await geoRes.json();
 
@@ -99,13 +100,12 @@ async function fetchWeatherEstimate(location: string, date: string) {
 
     const { latitude, longitude } = geoData.results[0];
 
-    // 2. Obter a previsão meteorológica para a data escolhida
     const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,weathercode,windspeed_10m_max&timezone=auto`);
     const weatherData = await weatherRes.json();
 
     if (weatherData && weatherData.daily) {
       const dates = weatherData.daily.time;
-      const index = dates.indexOf(date); // Procura exatamente o dia da prova
+      const index = dates.indexOf(date);
 
       if (index !== -1) {
         const tMax = weatherData.daily.temperature_2m_max[index];
@@ -241,7 +241,6 @@ export default function CoachDashboard() {
     }
   };
 
-  // Carregar Provas do Supabase
   const loadRaces = async (coachId: string) => {
     try {
       const { data, error } = await supabase
@@ -525,7 +524,6 @@ export default function CoachDashboard() {
     };
   };
 
-  // GUARDAR OU EDITAR PROVA DIRETAMENTE NO SUPABASE
   const handleSaveRace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!raceForm.name || !raceForm.distance || !coachProfile) return;
@@ -547,9 +545,8 @@ export default function CoachDashboard() {
     const athWeight = assignedAth?.weight ? parseFloat(assignedAth.weight) : 70;
     const preRaceNutrition = generatePreRaceNutrition(athWeight);
 
-    // Substitui a linha estática atual por:
-const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.date);
-    };
+    // Obter meteorologia dinâmica e real com base na localidade e data inseridas
+    const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.date);
 
     const athleteMetrics = {
       weeklyKm: raceForm.weeklyKm,
@@ -947,7 +944,7 @@ const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.d
                                   <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center text-xs">
                                     <div className="flex items-center gap-2">
                                       <CloudSun className="h-5 w-5 text-blue-400" />
-                                      <span className="text-slate-300">Meteorologia: <strong>{race.weatherEstimate.condition}</strong> ({race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax})</span>
+                                      <span className="text-slate-300">Meteorologia Real: <strong>{race.weatherEstimate.condition}</strong> ({race.weatherEstimate.tempMin} / {race.weatherEstimate.tempMax})</span>
                                     </div>
                                   </div>
                                 )}
@@ -1290,7 +1287,7 @@ const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.d
 
                     <div className="space-y-6 pt-2">
                       <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2 border-t border-slate-800 pt-6">
-                        <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta (Preenchimento Manual ou Auto)
+                        <Activity className="h-4 w-4" /> 3. Perfil Fisiológico e Métricas do Atleta
                       </h3>
 
                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -1539,7 +1536,7 @@ const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.d
                                   <div className="flex items-center gap-2.5">
                                     <CloudSun className="h-6 w-6 text-blue-400" />
                                     <div>
-                                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block">Previsão Meteorológica em {race.location}</span>
+                                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block">Previsão Meteorológica Real em {race.location}</span>
                                       <span className="text-xs text-slate-300 print:text-slate-700">Condição: <strong>{race.weatherEstimate.condition}</strong> • Vento: {race.weatherEstimate.wind} • Humidade: {race.weatherEstimate.humidity}</span>
                                     </div>
                                   </div>
