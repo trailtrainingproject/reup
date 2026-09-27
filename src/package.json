@@ -1,5 +1,5 @@
 {
-  "name": "trailx-coach",
+  "name": "trailtrainingproject",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,14 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.0.4",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "gpxparser": "^3.0.8",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/supabase-js": "^2.39.0",
     "fit-file-parser": "^1.1.8",
-    "gpxparser": "^3.0.8",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
     "pako": "^2.1.0",
