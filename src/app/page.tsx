@@ -547,12 +547,8 @@ export default function CoachDashboard() {
     const athWeight = assignedAth?.weight ? parseFloat(assignedAth.weight) : 70;
     const preRaceNutrition = generatePreRaceNutrition(athWeight);
 
-    const weatherEstimate = {
-      tempMin: '14°C',
-      tempMax: '24°C',
-      condition: 'Céu limpo / Sol',
-      humidity: '55%',
-      wind: '12 km/h NW'
+    // Substitui a linha estática atual por:
+const weatherEstimate = await fetchWeatherEstimate(raceForm.location, raceForm.date);
     };
 
     const athleteMetrics = {
