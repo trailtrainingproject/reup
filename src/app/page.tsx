@@ -466,53 +466,92 @@ export default function CoachDashboard() {
   };
 
   const generateRacePlanSectors = (
-    dist: number,
-    elev: number,
-    carbsPerHour: number,
-    maxHR: number,
-    restHR: number,
-    flatPace: string
-  ): RacePlanSector[] => {
-    const hrReserve = maxHR - restHR;
-    const z2Upper = Math.round(restHR + hrReserve * 0.7);
-    const z3Upper = Math.round(restHR + hrReserve * 0.8);
+  dist: number,
+  elev: number,
+  carbsPerHour: number,
+  maxHR: number,
+  restHR: number,
+  flatPace: string,
+  gpxText?: string | null
+): RacePlanSector[] => {
+  const hrReserve = maxHR - restHR;
+  const z2Upper = Math.round(restHR + hrReserve * 0.7);
+  const z3Upper = Math.round(restHR + hrReserve * 0.8);
 
-    const s1Km = (dist * 0.25).toFixed(1);
-    const s2Km = (dist * 0.65).toFixed(1);
+  let s1Elev = Math.round(elev * 0.25);
+  let s2Elev = Math.round(elev * 0.65);
+  let s3Elev = elev - s1Elev - s2Elev;
 
-    return [
-      {
-        sector: 'Setor 1: Início & Aquecimento',
-        distanceKm: `0.0 km - ${s1Km} km`,
-        terrain: 'Subidas graduais / Trilho inicial',
-        targetPace: `Gestão conservadora (${flatPace})`,
-        heartRateZone: `Z1/Z2 (Abaixo de ${z2Upper} bpm)`,
-        carbsTarget: `${Math.round(carbsPerHour * 0.8)}g HC/h`,
-        hydration: '500ml Água + Eletrólitos',
-        nutritionTips: 'Começar a ingestão líquida aos 20 min. Evitar géis muito concentrados no início.'
-      },
-      {
-        sector: 'Setor 2: Troço Técnico & Maior D+',
-        distanceKm: `${s1Km} km - ${s2Km} km`,
-        terrain: `Subidas íngremes e crestas (~${Math.round(elev * 0.65)}m D+)`,
-        targetPace: 'Ritmo constante / Power hiking',
-        heartRateZone: `Z2/Z3 (${z2Upper} - ${z3Upper} bpm)`,
-        carbsTarget: `${carbsPerHour}g HC/h`,
-        hydration: '600-750ml Água com Sódio',
-        nutritionTips: 'Alternar 1 Gel (2:1) com barras fáceis de mastigar a cada 30-40 min.'
-      },
-      {
-        sector: 'Setor 3: Descidas & Sprint Final',
-        distanceKm: `${s2Km} km - ${dist.toFixed(1)} km`,
-        terrain: 'Descidas técnicas e aproximação à meta',
-        targetPace: 'Aceleração controlada',
-        heartRateZone: `Z3/Z4 (${z3Upper} - ${maxHR} bpm)`,
-        carbsTarget: `${Math.round(carbsPerHour * 1.1)}g HC/h`,
-        hydration: '500ml Água / Isotónico',
-        nutritionTips: 'Priorizar géis rápidos ou hydrogels. Utilizar 50-100mg de Cafeína.'
+  let s1Km = (dist * 0.25).toFixed(1);
+  let s2Km = (dist * 0.65).toFixed(1);
+
+  // Se o utilizador carregou um ficheiro GPX, lemos os pontos reais de elevação!
+  if (gpxText) {
+    try {
+      const gpx = new gpxParser();
+      gpx.parse(gpxText);
+      const points = gpx.tracks[0]?.points || [];
+
+      if (points.length > 0) {
+        const totalPoints = points.length;
+        const p1Index = Math.floor(totalPoints * 0.25);
+        const p2Index = Math.floor(totalPoints * 0.65);
+
+        // Função para somar apenas o ganho positivo de elevação (D+) num troço
+        const calculateSegmentElevation = (pts: any[]) => {
+          let climb = 0;
+          for (let i = 1; i < pts.length; i++) {
+            const diff = (pts[i].ele || 0) - (pts[i - 1].ele || 0);
+            if (diff > 0) climb += diff;
+          }
+          return Math.round(climb);
+        };
+
+        s1Elev = calculateSegmentElevation(points.slice(0, p1Index));
+        s2Elev = calculateSegmentElevation(points.slice(p1Index, p2Index));
+        s3Elev = calculateSegmentElevation(points.slice(p2Index));
+
+        if (points[p1Index]?.dist) s1Km = (points[p1Index].dist).toFixed(1);
+        if (points[p2Index]?.dist) s2Km = (points[p2Index].dist).toFixed(1);
       }
-    ];
-  };
+    } catch (err) {
+      console.error('Erro ao interpretar o GPX, a usar estimativa proporcional:', err);
+    }
+  }
+
+  return [
+    {
+      sector: 'Setor 1: Início & Aquecimento',
+      distanceKm: `0.0 km - ${s1Km} km`,
+      terrain: `Subidas graduais (~${s1Elev}m D+)`,
+      targetPace: `Gestão conservadora (${flatPace})`,
+      heartRateZone: `Z1/Z2 (Abaixo de ${z2Upper} bpm)`,
+      carbsTarget: `${Math.round(carbsPerHour * 0.8)}g HC/h`,
+      hydration: '500ml Água + Eletrólitos',
+      nutritionTips: 'Começar a ingestão líquida aos 20 min. Evitar géis muito concentrados no início.'
+    },
+    {
+      sector: 'Setor 2: Troço Técnico & Maior D+',
+      distanceKm: `${s1Km} km - ${s2Km} km`,
+      terrain: `Subidas íngremes e crestas (~${s2Elev}m D+)`,
+      targetPace: 'Ritmo constante / Power hiking',
+      heartRateZone: `Z2/Z3 (${z2Upper} - ${z3Upper} bpm)`,
+      carbsTarget: `${carbsPerHour}g HC/h`,
+      hydration: '600-750ml Água com Sódio',
+      nutritionTips: 'Alternar 1 Gel (2:1) com barras fáceis de mastigar a cada 30-40 min.'
+    },
+    {
+      sector: 'Setor 3: Descidas & Sprint Final',
+      distanceKm: `${s2Km} km - ${dist.toFixed(1)} km`,
+      terrain: `Descidas técnicas e aproximação (~${s3Elev}m D+)`,
+      targetPace: 'Aceleração controlada',
+      heartRateZone: `Z3/Z4 (${z3Upper} - ${maxHR} bpm)`,
+      carbsTarget: `${Math.round(carbsPerHour * 1.1)}g HC/h`,
+      hydration: '500ml Água / Isotónico',
+      nutritionTips: 'Priorizar géis rápidos ou hydrogels. Utilizar 50-100mg de Cafeína.'
+    }
+  ];
+};
 
   const generatePreRaceNutrition = (athleteWeight: number = 70): PreRaceNutrition => {
     const baseCarbs = Math.round(athleteWeight * 7);
