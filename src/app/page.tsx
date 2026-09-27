@@ -2,6 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
+import gpxParser from 'gpxparser';
+
 import React, { useState, useEffect } from 'react';
 import {
   Mountain,
